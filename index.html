@@ -1,0 +1,2736 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Roughness Visualizer</title>
+  <script src="https://cdn.plot.ly/plotly-2.30.0.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&family=Inter:wght@400;500;600;700&display=swap');
+
+    :root{
+      /* MicroMeasure theme (dark UI) */
+      --bg-primary:#0f172a;
+      --bg-secondary:#1e293b;
+      --text-primary:#f1f5f9;
+      --accent-primary:#3b82f6;
+      --accent-secondary:#64748b;
+      --danger:#dc2626;
+
+      /* Keep existing variable names to minimize refactors */
+      --bg:var(--bg-primary);
+      --card:var(--bg-secondary);
+      --ink:var(--text-primary);
+      --muted:#94a3b8;
+      --line:rgba(255,255,255,0.10);      /* UI borders */
+      --grid:rgba(255,255,255,0.06);
+      --accent:var(--accent-primary);
+      --accent-2:#2563eb;                 /* hover */
+
+      /* Option A: publication-ready plots remain white */
+      --plot-bg:#ffffff;
+      --plot-axis:#111827;
+      --plot-grid:#e5e7eb;
+      --plot-line:#d7dbe5;                /* plot borders on dark UI */
+
+      --tab-bg:rgba(0,0,0,0.18);
+    }
+    *{ box-sizing:border-box; }
+    body{
+      margin:0;
+      font-family:'Inter',system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;
+      background:var(--bg);
+      color:var(--ink);
+    }
+    html{ color-scheme: dark; }
+    .mono{ font-family:'JetBrains Mono',monospace; }
+    .wrap{ max-width:1500px; margin:0 auto; padding:16px; display:grid; gap:12px; transition:filter .24s ease, transform .24s ease; }
+    body.dialogOpen{ overflow:hidden; }
+    body.dialogOpen .wrap{
+      filter:blur(10px) saturate(0.9);
+      transform:scale(0.995);
+      pointer-events:none;
+      user-select:none;
+    }
+    .top{ display:flex; flex-wrap:wrap; gap:10px; align-items:center; justify-content:space-between; }
+    h1{ margin:0; font-size:16px; font-weight:900; letter-spacing:.2px; }
+    .pill{
+      display:inline-block; padding:3px 8px; border:1px solid var(--line);
+      border-radius:999px; font-size:11px; color:var(--muted); margin-left:8px; background:rgba(0,0,0,0.18);
+    }
+    .row{ display:flex; flex-wrap:wrap; gap:10px; align-items:center; }
+
+    .card{
+      background:var(--card);
+      border:1px solid var(--line);
+      border-radius:14px;
+      padding:12px;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.35);
+    }
+
+    /* New layout: Controls left, Views right */
+    .grid{
+      display:grid;
+      grid-template-columns: 420px 1fr;
+      gap:12px;
+      align-items:start;
+    }
+    @media (max-width: 1100px){
+      .grid{ grid-template-columns:1fr; }
+    }
+
+    label{ font-size:12px; color:var(--muted); display:flex; gap:8px; align-items:center; }
+    input[type="number"], select{
+      background:rgba(0,0,0,0.18);
+      border:1px solid rgba(255,255,255,0.14);
+      color:var(--ink);
+      border-radius:10px;
+      padding:8px 10px;
+      outline:none;
+      width:150px;
+    }
+    /* Improve dropdown list readability on Windows (opened option list) */
+    select{ color-scheme: dark; }
+    select option, select optgroup{
+      background-color: #0f172a;
+      color: #f1f5f9;
+    }
+    input[type="number"]:focus, select:focus{
+      border-color: rgba(59,130,246,0.65);
+      box-shadow: 0 0 0 3px rgba(59,130,246,0.18);
+    }
+    input[type="range"]{ width:190px; }
+    input[type="file"]{ font-size:12px; color:var(--muted); }
+    input[type="file"]::file-selector-button{
+      background:var(--accent);
+      border:none;
+      color:white;
+      padding:8px 10px;
+      border-radius:10px;
+      cursor:pointer;
+      font-weight:900;
+      margin-right:10px;
+      transition: all .2s ease;
+    }
+    input[type="file"]::file-selector-button:hover{ background:var(--accent-2); box-shadow: 0 4px 12px rgba(59,130,246,0.35); }
+
+    .fileDrop{
+      padding:12px;
+      border-radius:14px;
+      border:1px dashed rgba(255,255,255,0.18);
+      background:rgba(255,255,255,0.03);
+      cursor:pointer;
+      user-select:none;
+    }
+    .fileDrop:focus{
+      outline:none;
+      border-color: rgba(59,130,246,0.65);
+      box-shadow: 0 0 0 3px rgba(59,130,246,0.18);
+    }
+    .fileDrop.dragover{
+      border-color: rgba(59,130,246,0.65);
+      box-shadow: 0 0 0 3px rgba(59,130,246,0.18);
+      background:rgba(59,130,246,0.08);
+    }
+    .fileDrop input[type="file"]{ width:100%; }
+
+    button, a.btn{
+      background:var(--accent);
+      border:none;
+      color:white;
+      padding:9px 12px;
+      border-radius:10px;
+      cursor:pointer;
+      font-weight:900;
+      font-size:12px;
+      transition: all .2s ease;
+      text-decoration:none;
+      display:inline-flex;
+      align-items:center;
+      justify-content:center;
+      gap:8px;
+    }
+    .btnIcon{ width:14px; height:14px; display:block; flex:0 0 auto; }
+    button:not(.secondary):not(.danger):not(.tabBtn):not(.toggleBtn):not(.helpBtn):not(.iconBtn):hover,
+    a.btn:not(.secondary):not(.danger):not(.tabBtn):not(.toggleBtn):not(.helpBtn):not(.iconBtn):hover{ background:var(--accent-2); transform:translateY(-1px); box-shadow: 0 4px 12px rgba(59,130,246,0.35); }
+    button:disabled{ background:#475569; cursor:not-allowed; transform:none; box-shadow:none; }
+    button.secondary, a.btn.secondary{
+      background:var(--accent-secondary);
+      border:none;
+      color:white;
+    }
+    button.danger, a.btn.danger{ background:var(--danger); }
+    button.secondary:hover, a.btn.secondary:hover{ background:#475569; box-shadow:none; transform:none; }
+    button.danger:hover, a.btn.danger:hover{ background:#b91c1c; transform:translateY(-1px); box-shadow: 0 4px 12px rgba(220,38,38,0.35); }
+
+    .hint{ font-size:12px; color:var(--muted); line-height:1.35; }
+    .small{ font-size:12px; color:var(--muted); }
+    .panelTitle{
+      font-weight:950;
+      margin-bottom:6px;
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:10px;
+    }
+    .divider{ height:1px; background:var(--line); margin:10px 0; }
+
+    /* Publication-ready canvases: white background + crisp lines */
+    canvas{
+      width:100%;
+      height:auto;
+      background:var(--plot-bg);
+      border:1px solid var(--plot-line);
+      border-radius:12px;
+      image-rendering:auto;
+    }
+    /* Heatmap stays pixelated to preserve grid structure */
+    #heat{ image-rendering: pixelated; }
+
+    #plotly3d{
+      width:100%;
+      height:520px;
+      border:1px solid var(--plot-line);
+      border-radius:12px;
+      overflow:hidden;
+      background:var(--plot-bg);
+    }
+
+    table{ width:100%; border-collapse:collapse; font-size:12px; }
+    td{ border-bottom:1px solid var(--line); padding:7px 6px; vertical-align:top; }
+    td:first-child{ color:var(--muted); width:56%; }
+    .status{ display:flex; gap:10px; flex-wrap:wrap; align-items:center; justify-content:space-between; }
+    .status strong{ color:var(--ink); }
+    .err{ color:var(--danger); font-weight:950; }
+    .ok{ color:var(--accent); font-weight:950; }
+
+    /* Publication-ready metrics (light mode) */
+    .pubReport{
+      background:#ffffff;
+      color:#0b1220;
+      border:1px solid var(--plot-line);
+      border-radius:12px;
+      padding:10px;
+    }
+    .pubMeta{ font-size:12px; color:#334155; margin-bottom:8px; }
+    .pubTable{ width:100%; border-collapse:collapse; font-size:12.5px; }
+    .pubTable th, .pubTable td{ border:1px solid #d7dbe5; padding:7px 8px; vertical-align:top; }
+    .pubTable th{ background:#f1f5f9; text-align:left; font-weight:900; }
+    .pubTable td.sym{ color:#334155; white-space:nowrap; }
+    .pubTable td.num{ text-align:right; font-variant-numeric: tabular-nums; }
+
+    /* Tabs */
+    .tabs{
+      display:flex;
+      gap:8px;
+      padding:6px;
+      background:var(--tab-bg);
+      border:1px solid var(--line);
+      border-radius:12px;
+    }
+    .tabBtn{
+      flex:0 0 auto;
+      background:transparent;
+      border:1px solid transparent;
+      color:var(--muted);
+      padding:9px 12px;
+      border-radius:10px;
+      cursor:pointer;
+      font-weight:950;
+      font-size:12px;
+      transition: all .2s ease;
+    }
+    .tabBtn.active{
+      background:var(--accent);
+      border-color:transparent;
+      color:white;
+      box-shadow: 0 4px 12px rgba(59,130,246,0.30);
+    }
+    .tabBtn:not(.active):hover{ background:rgba(0,0,0,0.18); color:var(--ink); border-color:rgba(255,255,255,0.10); }
+    .tabPanel{ display:none; margin-top:12px; }
+    .tabPanel.active{ display:block; }
+
+    /* Nested toggle buttons (Plotly vs Mesh) */
+    .toggleGroup{ display:flex; gap:8px; }
+    .toggleBtn{
+      background:rgba(0,0,0,0.18);
+      border:1px solid rgba(255,255,255,0.12);
+      color:var(--ink);
+      padding:8px 10px;
+      border-radius:10px;
+      cursor:pointer;
+      font-weight:950;
+      font-size:12px;
+      transition: all .2s ease;
+    }
+    .toggleBtn.active{
+      background:var(--accent);
+      border-color:transparent;
+      color:white;
+    }
+    .toggleBtn:not(.active):hover{ border-color:rgba(255,255,255,0.20); }
+
+    .exportRow{ display:flex; flex-wrap:wrap; gap:8px; justify-content:flex-end; margin-top:8px; }
+
+    /* Help button + modal */
+    .settingRow{ display:flex; gap:10px; align-items:center; justify-content:space-between; flex-wrap:wrap; }
+    .settingRow .left{ display:flex; gap:10px; align-items:center; flex-wrap:wrap; }
+    .helpBtn{
+      width:28px;
+      height:28px;
+      border-radius:10px;
+      border:1px solid rgba(255,255,255,0.14);
+      background:rgba(255,255,255,0.06);
+      color:var(--text-primary);
+      font-weight:950;
+      cursor:pointer;
+      padding:0;
+      line-height:1;
+      display:inline-flex;
+      align-items:center;
+      justify-content:center;
+      flex:0 0 auto;
+    }
+    .helpBtn:hover{ border-color:rgba(59,130,246,0.55); box-shadow:0 0 0 3px rgba(59,130,246,0.18); transform:none; }
+
+    .overlay{
+      position:fixed;
+      inset:0;
+      background:rgba(0,0,0,0.55);
+      display:flex;
+      align-items:flex-start;
+      justify-content:center;
+      padding:18px;
+      z-index:9999;
+      overflow:auto;
+    }
+    .overlay[hidden]{ display:none !important; }
+    .overlay.centered{
+      align-items:center;
+      background:rgba(7, 15, 31, 0.42);
+      backdrop-filter:blur(8px) saturate(120%);
+    }
+    .modal{
+      width:min(720px, 100%);
+      max-height: calc(100dvh - 36px);
+      background:var(--bg-secondary);
+      border:1px solid rgba(255,255,255,0.12);
+      border-radius:16px;
+      box-shadow:0 24px 80px rgba(0,0,0,0.55);
+      display:flex;
+      flex-direction:column;
+    }
+    .modalHead{
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      padding:12px 14px;
+      border-bottom:1px solid rgba(255,255,255,0.10);
+      gap:10px;
+      flex: 0 0 auto;
+    }
+    .modalTitle{ font-weight:950; }
+    .modalBody{
+      padding:14px;
+      color:var(--text-primary);
+      line-height:1.45;
+      overflow:auto;
+      -webkit-overflow-scrolling: touch;
+      flex: 1 1 auto;
+      min-height: 0;
+    }
+    .iconBtn{
+      width:32px;
+      height:32px;
+      border-radius:12px;
+      border:1px solid rgba(255,255,255,0.14);
+      background:rgba(255,255,255,0.06);
+      color:var(--text-primary);
+      cursor:pointer;
+      padding:0;
+      display:inline-flex;
+      align-items:center;
+      justify-content:center;
+      flex:0 0 auto;
+    }
+    .iconBtn:hover{ border-color:rgba(255,255,255,0.22); transform:none; box-shadow:none; }
+    .iconBtn.secondary{
+      background:var(--accent-secondary);
+      color:white;
+      border-color:transparent;
+    }
+    .iconBtn.secondary:hover{ background:#475569; }
+    .iconBtn.danger{
+      background:var(--danger);
+      color:white;
+      border-color:transparent;
+    }
+    .iconBtn.danger:hover{ background:#b91c1c; }
+    .resetModal{
+      width:min(560px, 100%);
+      background:linear-gradient(180deg, rgba(34,52,86,0.98), rgba(18,29,49,0.98));
+      border:1px solid rgba(148,163,184,0.24);
+      box-shadow:0 32px 90px rgba(2,8,23,0.45);
+    }
+    .resetModal .modalHead{
+      border-bottom:1px solid rgba(148,163,184,0.16);
+      padding:16px 18px 12px;
+      align-items:flex-start;
+    }
+    .resetHero{
+      display:flex;
+      gap:14px;
+      align-items:flex-start;
+    }
+    .resetIcon{
+      width:44px;
+      height:44px;
+      border-radius:14px;
+      display:inline-flex;
+      align-items:center;
+      justify-content:center;
+      color:#dbeafe;
+      background:linear-gradient(180deg, rgba(59,130,246,0.35), rgba(59,130,246,0.14));
+      border:1px solid rgba(147,197,253,0.28);
+      box-shadow:inset 0 1px 0 rgba(255,255,255,0.12);
+      flex:0 0 auto;
+    }
+    .resetEyebrow{
+      display:inline-block;
+      margin-bottom:6px;
+      padding:4px 10px;
+      border-radius:999px;
+      background:rgba(125,211,252,0.12);
+      border:1px solid rgba(125,211,252,0.18);
+      color:#bae6fd;
+      font-size:11px;
+      font-weight:800;
+      letter-spacing:.04em;
+      text-transform:uppercase;
+    }
+    .resetTitle{
+      margin:0;
+      font-size:22px;
+      line-height:1.15;
+      font-weight:900;
+      color:#f8fafc;
+    }
+    .resetSub{
+      margin:6px 0 0;
+      color:#cbd5e1;
+      font-size:14px;
+      line-height:1.5;
+    }
+    .resetModal .modalBody{ padding:0 18px 18px; }
+    .resetList{
+      margin:0;
+      padding:0;
+      list-style:none;
+      display:grid;
+      gap:10px;
+    }
+    .resetList li{
+      display:flex;
+      gap:12px;
+      align-items:flex-start;
+      padding:12px 14px;
+      border-radius:14px;
+      background:rgba(15,23,42,0.34);
+      border:1px solid rgba(148,163,184,0.12);
+      color:#e2e8f0;
+    }
+    .resetList svg{ width:16px; height:16px; color:#fca5a5; flex:0 0 auto; margin-top:2px; }
+    .resetList strong{ display:block; color:#f8fafc; margin-bottom:2px; }
+    .resetActions{
+      display:flex;
+      justify-content:flex-end;
+      gap:10px;
+      margin-top:18px;
+    }
+    .softBtn{
+      background:rgba(255,255,255,0.08);
+      color:#e2e8f0;
+      border:1px solid rgba(148,163,184,0.18);
+    }
+    .softBtn:hover{
+      background:rgba(255,255,255,0.12);
+      border-color:rgba(148,163,184,0.28);
+      transform:none;
+      box-shadow:none;
+    }
+    .primaryInfoBtn{
+      background:linear-gradient(180deg, #38bdf8, #2563eb);
+      color:#f8fafc;
+      border:1px solid rgba(147,197,253,0.22);
+      box-shadow:0 12px 28px rgba(37,99,235,0.24);
+    }
+    .primaryInfoBtn:hover{
+      background:linear-gradient(180deg, #67e8f9, #3b82f6);
+      transform:translateY(-1px);
+      box-shadow:0 16px 34px rgba(37,99,235,0.28);
+    }
+
+    /* WebGL canvas sizing */
+    #webgl3d{ width:100%; height:auto; display:block; }
+
+    /* Minor spacing */
+    .stack{ display:grid; gap:10px; }
+
+    /* Range styling aligned with MicroMeasure */
+    input[type="range"]{
+      -webkit-appearance:none;
+      appearance:none;
+      background:transparent;
+    }
+    input[type="range"]::-webkit-slider-track{
+      height:6px;
+      background:linear-gradient(to bottom, #1e293b, #334155, #1e293b);
+      border-radius:3px;
+      border:1px solid #64748b;
+      box-shadow:inset 0 1px 3px rgba(0,0,0,0.5), 0 1px 0 rgba(255,255,255,0.1);
+    }
+    input[type="range"]::-webkit-slider-thumb{
+      -webkit-appearance:none;
+      width:18px;
+      height:18px;
+      background:linear-gradient(to bottom, #60a5fa, #3b82f6);
+      border-radius:50%;
+      cursor:pointer;
+      margin-top:-6px;
+      border:2px solid #1e293b;
+      box-shadow:0 2px 6px rgba(59,130,246,0.6), inset 0 1px 0 rgba(255,255,255,0.3);
+    }
+    input[type="range"]::-webkit-slider-thumb:hover{
+      background:linear-gradient(to bottom, #93c5fd, #60a5fa);
+      box-shadow:0 3px 8px rgba(59,130,246,0.8), inset 0 1px 0 rgba(255,255,255,0.4);
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="top">
+      <h1>Roughness Visualizer <span class="pill">CSV heightmap • NxN • µm</span></h1>
+      <div class="row">
+        <a id="homeBtn" href="https://www.inanolab.com/#extras" class="btn iconBtn secondary" aria-label="Home" title="Home" rel="noopener noreferrer">
+          <svg class="btnIcon" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10.5L12 3l9 7.5M5.25 8.625V21h13.5V8.625"/>
+          </svg>
+        </a>
+        <button id="loadDemo" class="iconBtn secondary" type="button" aria-label="Load Demo" title="Load Demo">
+          <svg class="btnIcon" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 18V7m0 11h12M7 15l2.5-4 3 2 4.5-6"/>
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 7l3-2m9 13l3-2M7 5h10v11" opacity="0.7"/>
+          </svg>
+        </button>
+        <button id="reset" class="iconBtn danger" type="button" aria-label="Reset" title="Reset">
+          <svg class="btnIcon" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v6h6M20 20v-6h-6M20 9a8 8 0 00-13.657-3.657L4 10M4 15a8 8 0 0013.657 3.657L20 14"/>
+          </svg>
+        </button>
+        <button id="topHelp" class="iconBtn secondary" type="button" aria-label="Help" title="Help">
+          <svg class="btnIcon" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+          </svg>
+        </button>
+      </div>
+    </div>
+
+    <div class="grid">
+      <!-- LEFT: Controls & Stats -->
+      <div class="card">
+        <div id="fileDrop" class="fileDrop" tabindex="0" role="button" aria-label="Drag and drop a CSV file here or click to choose a file">
+          <div class="small" style="margin-bottom:8px;">Drag &amp; drop your CSV here, or click to choose.</div>
+          <input id="file" type="file" accept=".csv,.txt" />
+          <div class="small" id="fileFeedback" aria-live="polite" style="margin-top:6px;">No file loaded.</div>
+        </div>
+        <div class="divider"></div>
+
+        <div class="panelTitle">Controls & Stats</div>
+        <div class="hint">
+          Upload your NxN CSV → updates render automatically. In 2D: click heatmap for <b>row profile</b>, <b>Shift+Click</b> for column profile.
+        </div>
+
+        <div class="divider"></div>
+
+        <div class="stack">
+          <div class="settingRow">
+            <div class="left">
+              <label>Colormap
+                <select id="cmap">
+                  <option value="turbo">Turbo (default)</option>
+                  <option value="gray">Grayscale</option>
+                  <option value="blueRed">Blue–Red</option>
+                  <option value="heat">Heat</option>
+                </select>
+              </label>
+            </div>
+            <button class="helpBtn" type="button" data-help="colormap" aria-label="Help: Colormap">?</button>
+          </div>
+
+          <div class="settingRow">
+            <div class="left">
+              <label>Downsample
+                <select id="ds">
+                  <option value="1">1×</option>
+                  <option value="2">2×</option>
+                  <option value="4">4×</option>
+                  <option value="8">8×</option>
+                  <option value="16">16×</option>
+                </select>
+              </label>
+            </div>
+            <button class="helpBtn" type="button" data-help="downsample" aria-label="Help: Downsample">?</button>
+          </div>
+
+          <div class="settingRow">
+            <div class="left">
+              <div class="row" style="gap:12px; align-items:center;">
+                <label>X length (µm)
+                  <input id="xLenUm" type="number" min="0" step="0.1" value="0" style="width:120px;" />
+                </label>
+                <label>Y length (µm)
+                  <input id="yLenUm" type="number" min="0" step="0.1" value="0" style="width:120px;" />
+                </label>
+                <span class="small" id="xyScaleInfo">dx/dy: —</span>
+              </div>
+            </div>
+            <button class="helpBtn" type="button" data-help="xylen" aria-label="Help: X/Y length">?</button>
+          </div>
+
+          <div class="settingRow">
+            <div class="left">
+              <label>Range
+                <select id="rangeMode">
+                  <option value="auto">Auto (min/max)</option>
+                  <option value="clip">Auto (1–99% clip)</option>
+                  <option value="manual">Manual</option>
+                </select>
+              </label>
+            </div>
+            <button class="helpBtn" type="button" data-help="range" aria-label="Help: Range">?</button>
+          </div>
+
+          <div class="row">
+            <label>Min (µm)
+              <input id="minv" type="number" step="0.0000001" disabled />
+            </label>
+
+            <label>Max (µm)
+              <input id="maxv" type="number" step="0.0000001" disabled />
+            </label>
+          </div>
+
+          <div class="settingRow">
+            <div class="left">
+              <label><input id="demean" type="checkbox" checked /> Subtract mean plane (z − z̄)</label>
+            </div>
+            <button class="helpBtn" type="button" data-help="meanPlane" aria-label="Help: Subtract mean plane">?</button>
+          </div>
+
+          <div class="divider"></div>
+          <div class="panelTitle">3D Controls</div>
+
+          <div class="settingRow">
+            <div class="left">
+              <div class="row" style="gap:12px; align-items:center;">
+                <div style="min-width:260px;">
+                  <div class="small" style="margin-bottom:6px;">Z-axis × <span id="zscaleVal">1.0×</span></div>
+                  <div id="zMultGroup" class="toggleGroup" role="group" aria-label="Z-axis multiplier" style="flex-wrap:wrap;">
+                    <button type="button" class="toggleBtn" data-mult="0.5" aria-pressed="false">0.5×</button>
+                    <button type="button" class="toggleBtn" data-mult="0.8" aria-pressed="false">0.8×</button>
+                    <button type="button" class="toggleBtn active" data-mult="1.0" aria-pressed="true">1.0×</button>
+                    <button type="button" class="toggleBtn" data-mult="2.0" aria-pressed="false">2.0×</button>
+                    <button type="button" class="toggleBtn" data-mult="3.0" aria-pressed="false">3.0×</button>
+                    <button type="button" class="toggleBtn" data-mult="4.0" aria-pressed="false">4.0×</button>
+                    <button type="button" class="toggleBtn" data-mult="5.0" aria-pressed="false">5.0×</button>
+                  </div>
+                </div>
+                <label>Z-axis max (µm)
+                  <input id="zmaxNum" type="number" min="0" step="0.1" value="10" style="width:110px;" aria-label="Z-axis maximum (µm)" />
+                </label>
+              </div>
+            </div>
+            <button class="helpBtn" type="button" data-help="zscale" aria-label="Help: Z-scale">?</button>
+          </div>
+
+          <div class="divider"></div>
+
+          <div class="row" style="justify-content:space-between;">
+            <div class="small" id="warn"></div>
+          </div>
+
+          <div class="divider"></div>
+          <div class="panelTitle">Status</div>
+          <div class="small" id="status">No data loaded.</div>
+
+          <div class="divider"></div>
+          <div class="panelTitle">
+            <span>Roughness metrics</span>
+            <button class="helpBtn" type="button" data-help="metrics" aria-label="Help: Roughness metrics">?</button>
+          </div>
+          <div class="pubReport" id="metricsReport">
+            <div class="pubMeta" id="metricsMeta">No data loaded.</div>
+            <table class="pubTable" aria-label="Roughness metrics">
+              <thead>
+                <tr>
+                  <th>Metric</th>
+                  <th>Symbol</th>
+                  <th class="num">Value</th>
+                  <th>Unit</th>
+                </tr>
+              </thead>
+              <tbody id="metricsBody"></tbody>
+            </table>
+            <div id="metricsActionsFeedback" class="pubMeta" aria-live="polite" style="margin-top:8px; margin-bottom:0;"></div>
+          </div>
+          <div class="exportRow" aria-label="Roughness metric export actions">
+            <button id="exportMetricsPng" class="secondary">Export Roughness Metrics PNG</button>
+            <button id="copyMetricsTsv" class="secondary">Copy TSV</button>
+          </div>
+          <div class="hint" style="margin-top:8px;">
+            Sa = mean(|z − z̄|), Sq = RMS(z − z̄), Sz = max − min (µm).
+          </div>
+        </div>
+      </div>
+
+      <!-- RIGHT: Views with two tabs -->
+      <div class="card">
+        <div class="panelTitle">
+          <div>Views</div>
+          <div class="small" id="clickInfo"></div>
+        </div>
+
+        <div class="tabs" role="tablist" aria-label="View tabs">
+          <button id="tab2dBtn" class="tabBtn active" role="tab" aria-selected="true">2D View</button>
+          <button id="tab3dBtn" class="tabBtn" role="tab" aria-selected="false">3D View</button>
+        </div>
+
+        <!-- 2D TAB -->
+        <div id="tab2d" class="tabPanel active" role="tabpanel">
+          <div class="panelTitle">
+            <div>2D Heat Map</div>
+            <button id="exportHeat" class="secondary">Export Heatmap PNG</button>
+          </div>
+          <canvas id="heat" width="512" height="512"></canvas>
+
+          <div class="divider"></div>
+
+          <div class="panelTitle">
+            <div>Line Profile</div>
+            <div class="row">
+              <div class="small" id="profileInfo"></div>
+              <button id="exportProfile" class="secondary">Export Profile PNG</button>
+            </div>
+          </div>
+          <canvas id="profile" width="1000" height="300"></canvas>
+
+          <div class="divider"></div>
+
+          <div class="panelTitle">
+            <div>Histogram</div>
+            <div class="row">
+              <div class="small" id="histInfo"></div>
+              <button id="exportHist" class="secondary">Export Histogram PNG</button>
+            </div>
+          </div>
+          <canvas id="hist" width="1000" height="300"></canvas>
+        </div>
+
+        <!-- 3D TAB -->
+        <div id="tab3d" class="tabPanel" role="tabpanel">
+          <div class="panelTitle">
+            <div>3D View</div>
+          </div>
+          <div class="hint" style="display:flex; gap:10px; align-items:center; justify-content:space-between; flex-wrap:wrap;">
+            <div>Plotly surface uses the same colormap/range as 2D.</div>
+            <button id="exportPlotly" class="secondary">Export 3D (Plotly) PNG</button>
+          </div>
+
+          <div style="margin-top:10px;">
+            <div id="plotlyWrap">
+              <div id="plotly3d"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div><!-- /grid -->
+  </div><!-- /wrap -->
+
+  <!-- Help overlay (single, reusable) -->
+  <div id="helpOverlay" class="overlay" hidden>
+    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="helpTitle">
+      <div class="modalHead">
+        <div id="helpTitle" class="modalTitle">Roughness Visualizer Documentation</div>
+        <button id="helpClose" class="iconBtn" type="button" aria-label="Close help">✕</button>
+      </div>
+      <div id="helpBody" class="modalBody"></div>
+    </div>
+  </div>
+
+  <div id="homeOverlay" class="overlay centered" hidden>
+    <div class="modal resetModal" role="dialog" aria-modal="true" aria-labelledby="homeTitle" aria-describedby="homeDesc">
+      <div class="modalHead">
+        <div class="resetHero">
+          <div class="resetIcon" aria-hidden="true">
+            <svg class="btnIcon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10.5L12 3l9 7.5M5.25 8.625V21h13.5V8.625"/>
+            </svg>
+          </div>
+          <div>
+            <div class="resetEyebrow">Go to Home Page</div>
+            <h2 id="homeTitle" class="resetTitle">Leave this visualizer?</h2>
+            <p id="homeDesc" class="resetSub">This will open the i-Nano Research Facility home page and take you away from the current session. You will be redirected to www.inanolab.com/#extras.</p>
+          </div>
+        </div>
+        <button id="homeClose" class="iconBtn" type="button" aria-label="Close home dialog">✕</button>
+      </div>
+      <div class="modalBody">
+        <div class="resetActions">
+          <button id="homeCancel" class="softBtn" type="button">Stay here</button>
+          <button id="homeConfirm" class="primaryInfoBtn" type="button">Go to home page</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="demoOverlay" class="overlay centered" hidden>
+    <div class="modal resetModal" role="dialog" aria-modal="true" aria-labelledby="demoTitle" aria-describedby="demoDesc">
+      <div class="modalHead">
+        <div class="resetHero">
+          <div class="resetIcon" aria-hidden="true">
+            <svg class="btnIcon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 18V7m0 11h12M7 15l2.5-4 3 2 4.5-6"/>
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 7l3-2m9 13l3-2M7 5h10v11" opacity="0.7"/>
+            </svg>
+          </div>
+          <div>
+            <div class="resetEyebrow">Load Demo Data</div>
+            <h2 id="demoTitle" class="resetTitle">Replace the current view with a demo surface?</h2>
+            <p id="demoDesc" class="resetSub">This loads a generated 3D roughness sample so you can explore the visualizer without uploading a CSV.</p>
+          </div>
+        </div>
+        <button id="demoClose" class="iconBtn" type="button" aria-label="Close demo dialog">✕</button>
+      </div>
+      <div class="modalBody">
+        <ul class="resetList">
+          <li>
+            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 6l12 12M18 6L6 18"/>
+            </svg>
+            <div><strong>Current dataset</strong>Any loaded CSV or active demo data will be replaced by the sample surface.</div>
+          </li>
+          <li>
+            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 6l12 12M18 6L6 18"/>
+            </svg>
+            <div><strong>Generated outputs</strong>The heatmap, profiles, histogram, 3D surface, and metrics will refresh using the demo dataset.</div>
+          </li>
+        </ul>
+        <div class="resetActions">
+          <button id="demoCancel" class="softBtn" type="button">Cancel</button>
+          <button id="demoConfirm" class="primaryInfoBtn" type="button">Load demo</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="resetOverlay" class="overlay centered" hidden>
+    <div class="modal resetModal" role="dialog" aria-modal="true" aria-labelledby="resetTitle" aria-describedby="resetDesc">
+      <div class="modalHead">
+        <div class="resetHero">
+          <div class="resetIcon" aria-hidden="true">
+            <svg class="btnIcon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v6h6M20 20v-6h-6M20 9a8 8 0 00-13.657-3.657L4 10M4 15a8 8 0 0013.657 3.657L20 14"/>
+            </svg>
+          </div>
+          <div>
+            <div class="resetEyebrow">Start fresh</div>
+            <h2 id="resetTitle" class="resetTitle">Reset this session?</h2>
+            <p id="resetDesc" class="resetSub">This returns the visualizer to its default state so you can begin a new analysis with a clean workspace.</p>
+          </div>
+        </div>
+        <button id="resetClose" class="iconBtn" type="button" aria-label="Close reset dialog">✕</button>
+      </div>
+      <div class="modalBody">
+        <ul class="resetList">
+          <li>
+            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 6l12 12M18 6L6 18"/>
+            </svg>
+            <div><strong>Current file</strong>Your loaded CSV or demo dataset will be cleared.</div>
+          </li>
+          <li>
+            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 6l12 12M18 6L6 18"/>
+            </svg>
+            <div><strong>Generated views</strong>Plots, profiles, histogram, and calculated roughness metrics will reset.</div>
+          </li>
+          <li>
+            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 6l12 12M18 6L6 18"/>
+            </svg>
+            <div><strong>Display settings</strong>Colormap, downsample, range, and Z-axis controls will return to their defaults.</div>
+          </li>
+        </ul>
+        <div class="resetActions">
+          <button id="resetCancel" class="softBtn" type="button">Keep working</button>
+          <button id="resetConfirm" class="primaryInfoBtn" type="button">Reset app</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+<script>
+(() => {
+  // =========================
+  // State
+  // =========================
+  let Z = null;       // Float64Array flattened (stored in µm)
+  let N = 0;          // size NxN
+  let zMin = 0, zMax = 0, zMean = 0, zStd = 0;
+  let lastProfile = null;
+  let dataLabel = "—";
+  let metricsSa = null;
+
+  // =========================
+  // Units
+  // =========================
+  // The UI and all reported metrics are in micrometers (µm).
+  // Incoming CSV height values are assumed to be in meters (m) and are converted to µm on load.
+  // If your CSV is already in µm, set this to 1.0.
+  const Z_INPUT_TO_UM = 1e6;
+
+  // App metadata (shown in Documentation)
+  const APP_VERSION = "1.0";
+  const APP_URL = "https://www.inanolab.com/roughness.html";
+  const HOME_URL = "https://www.inanolab.com/#extras";
+
+  // WebGL state
+  let gl = null;
+  let webgl = null;
+  let prog = null;
+  let mesh = null;
+  let cam = { yaw: -0.8, pitch: 0.65, dist: 2.8, target:[0,0,0] };
+  let drag = { on:false, x:0, y:0 };
+  let needsRedraw = true;
+  let isWebGL2 = false;
+  let hasUint32ElementIndex = false;
+
+  // =========================
+  // DOM helpers
+  // =========================
+  const el = (id) => document.getElementById(id);
+
+  const heat = el("heat"), ctxH = heat.getContext("2d");
+  const prof = el("profile"), ctxP = prof.getContext("2d");
+  const hist = el("hist"), ctxHi = hist.getContext("2d");
+
+  const status = el("status"), clickInfo = el("clickInfo");
+  const profileInfo = el("profileInfo"), histInfo = el("histInfo");
+  const metricsMeta = el("metricsMeta");
+  const metricsBody = el("metricsBody");
+  const metricsReport = el("metricsReport");
+  const metricsActionsFeedback = el("metricsActionsFeedback");
+  const warn = el("warn");
+  const fileFeedback = el("fileFeedback");
+
+  // Lateral scale inputs (optional physical lengths)
+  const xLenUmEl = el("xLenUm");
+  const yLenUmEl = el("yLenUm");
+  const xyScaleInfoEl = el("xyScaleInfo");
+
+  function getLateralScale(){
+    const Lx = Number(xLenUmEl?.value);
+    const Ly = Number(yLenUmEl?.value);
+    const hasX = Number.isFinite(Lx) && Lx > 0 && N > 1;
+    const hasY = Number.isFinite(Ly) && Ly > 0 && N > 1;
+    const dx = hasX ? (Lx / (N - 1)) : NaN;
+    const dy = hasY ? (Ly / (N - 1)) : NaN;
+    return { hasX, hasY, Lx, Ly, dx, dy };
+  }
+
+  function updateLateralScaleInfo(){
+    if (!xyScaleInfoEl) return;
+    const s = getLateralScale();
+    if (!s.hasX && !s.hasY){
+      xyScaleInfoEl.textContent = "dx/dy: —";
+      return;
+    }
+    const parts = [];
+    if (s.hasX) parts.push(`dx=${fmt(s.dx)} µm`);
+    if (s.hasY) parts.push(`dy=${fmt(s.dy)} µm`);
+    xyScaleInfoEl.textContent = parts.join(", ");
+  }
+
+  // Tabs
+  const tab2dBtn = el("tab2dBtn");
+  const tab3dBtn = el("tab3dBtn");
+  const tab2d = el("tab2d");
+  const tab3d = el("tab3d");
+
+  function setTab(which){
+    const is2d = which === "2d";
+    tab2dBtn.classList.toggle("active", is2d);
+    tab3dBtn.classList.toggle("active", !is2d);
+    tab2dBtn.setAttribute("aria-selected", is2d ? "true" : "false");
+    tab3dBtn.setAttribute("aria-selected", !is2d ? "true" : "false");
+    tab2d.classList.toggle("active", is2d);
+    tab3d.classList.toggle("active", !is2d);
+
+    // Plotly sometimes needs a resize when container was hidden
+    if (!is2d){
+      try{ Plotly.Plots.resize("plotly3d"); } catch {}
+    }
+  }
+  tab2dBtn.addEventListener("click", () => setTab("2d"));
+  tab3dBtn.addEventListener("click", () => setTab("3d"));
+
+  // =========================
+  // CSV parsing
+  // =========================
+  function detectDelimiter(line){
+    const hasTab = line.includes("\t");
+    const hasComma = line.includes(",");
+    if (hasTab) return "\t";
+    if (hasComma) return ",";
+    return " "; // fallback (space)
+  }
+  function splitLine(line, delim){
+    if (delim === " ") return line.trim().split(/\s+/);
+    return line.trim().split(delim);
+  }
+  function parseGrid(text){
+    const lines = text.trim().split(/\r?\n/).filter(l => l.trim().length);
+    if (!lines.length) throw new Error("Empty file.");
+    const delim = detectDelimiter(lines[0]);
+    const first = splitLine(lines[0], delim);
+    const rows = lines.length;
+    const cols = first.length;
+    if (rows !== cols) throw new Error(`Grid must be square (NxN). Got ${rows}×${cols}.`);
+    const data = new Float64Array(rows * cols);
+
+    let k = 0;
+    for (let i=0;i<rows;i++){
+      const parts = splitLine(lines[i], delim);
+      if (parts.length !== cols) throw new Error(`Row ${i+1} has ${parts.length} cols; expected ${cols}.`);
+      for (let j=0;j<cols;j++){
+        const v = Number(parts[j]);
+        if (!Number.isFinite(v)) throw new Error(`Invalid number at row ${i+1}, col ${j+1}.`);
+        data[k++] = v * Z_INPUT_TO_UM;
+      }
+    }
+    return { data, n: rows, delim };
+  }
+
+  // =========================
+  // Stats
+  // =========================
+  function computeStats(arr){
+    let mn = Infinity, mx = -Infinity, sum = 0;
+    for (let i=0;i<arr.length;i++){
+      const v = arr[i];
+      if (v < mn) mn = v;
+      if (v > mx) mx = v;
+      sum += v;
+    }
+    const mean = sum / arr.length;
+    let s2 = 0;
+    for (let i=0;i<arr.length;i++){
+      const d = arr[i] - mean;
+      s2 += d*d;
+    }
+    const std = Math.sqrt(s2 / arr.length);
+    return { mn, mx, mean, std };
+  }
+  function quantileApprox(arr, q){
+    const n = arr.length;
+    const sampleN = Math.min(250000, n);
+    const step = Math.max(1, Math.floor(n / sampleN));
+    const samp = [];
+    for (let i=0;i<n;i+=step) samp.push(arr[i]);
+    samp.sort((a,b)=>a-b);
+    const idx = Math.max(0, Math.min(samp.length-1, Math.floor(q*(samp.length-1))));
+    return samp[idx];
+  }
+  function fmt(x){
+    if (!Number.isFinite(x)) return "—";
+    const ax = Math.abs(x);
+    if (ax !== 0 && (ax < 0.001 || ax >= 1000)) return x.toExponential(6);
+    return x.toFixed(6);
+  }
+
+  // =========================
+  // Colormaps
+  // =========================
+  function clamp01(x){ return x<0?0:(x>1?1:x); }
+  function cmapTurbo(t){
+    const x = clamp01(t);
+    const r = 34.61 + x*(1172.33 + x*(-10793.56 + x*(33300.12 + x*(-38394.49 + x*14825.05))));
+    const g = 23.31 + x*(557.33 + x*(1225.33 + x*(-3574.96 + x*(1429.70 + x*0.0))));
+    const b = 27.20 + x*(3211.10 + x*(-15327.97 + x*(27814.00 + x*(-22569.18 + x*6838.66))));
+    return [Math.max(0,Math.min(255,r)), Math.max(0,Math.min(255,g)), Math.max(0,Math.min(255,b))];
+  }
+  function cmapGray(t){ const v = Math.round(255*clamp01(t)); return [v,v,v]; }
+  function cmapHeat(t){
+    const x = clamp01(t);
+    const r = Math.round(255*clamp01(x*1.2));
+    const g = Math.round(255*clamp01((x-0.35)*1.3));
+    const b = Math.round(255*clamp01((x-0.75)*2.0));
+    return [r,g,b];
+  }
+  function cmapBlueRed(t){
+    const x = clamp01(t);
+    const r = Math.round(255*x);
+    const b = Math.round(255*(1-x));
+    const g = Math.round(255*(0.2 + 0.6*(1-Math.abs(x-0.5)*2)));
+    return [r,g,b];
+  }
+  function getCmap(){
+    const v = el("cmap").value;
+    if (v==="gray") return cmapGray;
+    if (v==="heat") return cmapHeat;
+    if (v==="blueRed") return cmapBlueRed;
+    return cmapTurbo;
+  }
+  function plotlyColorscale(name){
+    if (name==="gray") return "Greys";
+    if (name==="heat") return "Hot";
+    if (name==="blueRed") return "RdBu";
+    return "Turbo";
+  }
+
+  // =========================
+  // Data processing
+  // =========================
+  function getProcessedGrid(){
+    if (!Z) return null;
+    const ds = Number(el("ds").value);
+    const demean = el("demean").checked;
+
+    const W = Math.floor(N / ds);
+    const grid = new Float64Array(W * W);
+
+    let p = 0;
+    for (let y=0;y<W;y++){
+      const y0 = y*ds;
+      for (let x=0;x<W;x++){
+        const x0 = x*ds;
+        let sum = 0;
+        for (let yy=0;yy<ds;yy++){
+          const row = (y0+yy)*N + x0;
+          for (let xx=0;xx<ds;xx++){
+            sum += Z[row + xx];
+          }
+        }
+        let v = sum / (ds*ds);
+        if (demean) v -= zMean;
+        grid[p++] = v;
+      }
+    }
+
+    const mode = el("rangeMode").value;
+    let lo = (demean ? (zMin - zMean) : zMin);
+    let hi = (demean ? (zMax - zMean) : zMax);
+
+    if (mode === "clip"){
+      lo = quantileApprox(grid, 0.01);
+      hi = quantileApprox(grid, 0.99);
+    } else if (mode === "manual"){
+      const mn = Number(el("minv").value);
+      const mx = Number(el("maxv").value);
+      if (Number.isFinite(mn) && Number.isFinite(mx) && mx > mn){
+        lo = mn; hi = mx;
+      }
+    }
+
+    return { grid, W, ds, demean, lo, hi };
+  }
+
+  function updateRangeInputsForMode(){
+    const mode = el("rangeMode").value;
+    const manual = (mode === "manual");
+    el("minv").disabled = !manual;
+    el("maxv").disabled = !manual;
+
+    const proc = getProcessedGrid();
+    if (!proc) return;
+    if (!manual){
+      el("minv").value = proc.lo;
+      el("maxv").value = proc.hi;
+    }
+  }
+
+  // =========================
+  // Publication-ready 2D plot styling helpers
+  // =========================
+  function clearPlotCanvas(ctx, w, h){
+    ctx.clearRect(0,0,w,h);
+    ctx.fillStyle = "#ffffff";
+    ctx.fillRect(0,0,w,h);
+  }
+
+  function drawPlotAxes(ctx, w, h, opts){
+    const padL = 58, padR = 18, padT = 34, padB = 50;
+    clearPlotCanvas(ctx, w, h);
+
+    const axis = "#111827";
+    const grid = "#e5e7eb";
+
+    // Grid
+    ctx.save();
+    ctx.strokeStyle = grid;
+    ctx.lineWidth = 1;
+    ctx.setLineDash([3,3]);
+    const nx = 6, ny = 5;
+    for (let i=1;i<nx;i++){
+      const x = padL + (w - padL - padR) * (i/nx);
+      ctx.beginPath(); ctx.moveTo(x,padT); ctx.lineTo(x,h-padB); ctx.stroke();
+    }
+    for (let j=1;j<ny;j++){
+      const y = padT + (h - padT - padB) * (j/ny);
+      ctx.beginPath(); ctx.moveTo(padL,y); ctx.lineTo(w-padR,y); ctx.stroke();
+    }
+    ctx.restore();
+
+    // Axes
+    ctx.strokeStyle = axis;
+    ctx.lineWidth = 1.6;
+    ctx.setLineDash([]);
+    ctx.beginPath();
+    ctx.moveTo(padL, padT);
+    ctx.lineTo(padL, h-padB);
+    ctx.lineTo(w-padR, h-padB);
+    ctx.stroke();
+
+    // Title + labels
+    ctx.fillStyle = axis;
+    ctx.font = "700 14px system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif";
+    ctx.textAlign = "left";
+    if (opts.title) ctx.fillText(opts.title, padL, 22);
+
+    ctx.font = "600 13px system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif";
+    ctx.textAlign = "center";
+    if (opts.xlabel) ctx.fillText(opts.xlabel, (padL + (w-padR))/2, h-14);
+
+    if (opts.ylabel){
+      ctx.save();
+      ctx.translate(18, (padT + (h-padB))/2);
+      ctx.rotate(-Math.PI/2);
+      ctx.textAlign = "center";
+      ctx.fillText(opts.ylabel, 0, 0);
+      ctx.restore();
+    }
+
+    return { padL, padR, padT, padB };
+  }
+
+  // =========================
+  // 2D Heatmap
+  // =========================
+  function renderHeatmap(proc){
+    const { grid, W, lo, hi } = proc;
+    heat.width = W; heat.height = W;
+
+    const cmap = getCmap();
+    const img = ctxH.createImageData(W, W);
+    const out = img.data;
+    const inv = 1 / (hi - lo || 1);
+
+    let p = 0;
+    for (let i=0;i<grid.length;i++){
+      const t = clamp01((grid[i] - lo) * inv);
+      const [r,g,b] = cmap(t);
+      out[p++] = r|0;
+      out[p++] = g|0;
+      out[p++] = b|0;
+      out[p++] = 255;
+    }
+    ctxH.putImageData(img, 0, 0);
+  }
+
+  // =========================
+  // Line profile
+  // =========================
+  function renderProfile(kind, idx){
+    if (!Z) return;
+
+    const w = prof.width, h = prof.height;
+    const demean = el("demean").checked;
+
+    const s = getLateralScale();
+    const isRow = kind === "row";
+    const hasDist = isRow ? s.hasX : s.hasY;
+    const distLen = isRow ? s.Lx : s.Ly;
+    const fixedUm = isRow
+      ? (s.hasY ? (idx * s.dy) : NaN)
+      : (s.hasX ? (idx * s.dx) : NaN);
+    const fixedLabel = Number.isFinite(fixedUm) ? ` (${fmt(fixedUm)} µm)` : "";
+
+    const line = new Float64Array(N);
+    if (kind === "row"){
+      const off = idx*N;
+      for (let x=0;x<N;x++) line[x] = Z[off + x];
+    } else {
+      for (let y=0;y<N;y++) line[y] = Z[y*N + idx];
+    }
+    if (demean){
+      for (let i=0;i<line.length;i++) line[i] -= zMean;
+    }
+
+    let mn = Infinity, mx = -Infinity;
+    for (let i=0;i<N;i++){ const v=line[i]; if(v<mn) mn=v; if(v>mx) mx=v; }
+    if (mn === mx){ mn -= 1e-12; mx += 1e-12; }
+
+    const ax = drawPlotAxes(ctxP, w, h, {
+      title: `${kind.toUpperCase()} profile @ ${isRow ? "y" : "x"} = ${idx}${fixedLabel}`,
+      xlabel: hasDist ? "Distance (µm)" : "Index",
+      ylabel: "Height (µm)"
+    });
+
+    const axis = "#111827";
+
+    ctxP.strokeStyle = axis;
+    ctxP.lineWidth = 2;
+    ctxP.beginPath();
+
+    const x0 = ax.padL, x1 = w - ax.padR;
+    const y0 = h - ax.padB, y1 = ax.padT;
+    for (let i=0;i<N;i++){
+      const x = x0 + (x1-x0) * (i/(N-1));
+      const y = y0 - (y0-y1) * ((line[i]-mn)/(mx-mn));
+      if (i===0) ctxP.moveTo(x,y); else ctxP.lineTo(x,y);
+    }
+    ctxP.stroke();
+
+    ctxP.fillStyle = axis;
+    ctxP.font = "600 12px system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif";
+    ctxP.textAlign = "left";
+    ctxP.fillText(`min: ${fmt(mn)} µm`, ax.padL, h-ax.padB+18);
+    ctxP.fillText(`max: ${fmt(mx)} µm`, ax.padL+190, h-ax.padB+18);
+    ctxP.fillText(`mode: ${demean ? "demeaned (z−z̄)" : "raw"}`, ax.padL+380, h-ax.padB+18);
+
+    if (hasDist && Number.isFinite(distLen)){
+      ctxP.fillText(`length: ${fmt(distLen)} µm`, ax.padL+690, h-ax.padB+18);
+    }
+
+    profileInfo.textContent = `${kind} ${idx} • ${demean ? "demeaned" : "raw"}`;
+    lastProfile = { kind, idx };
+  }
+
+  // =========================
+  // Histogram
+  // =========================
+  function renderHistogram(proc){
+    const { grid } = proc;
+
+    const w = hist.width, h = hist.height;
+    const lo = quantileApprox(grid, 0.01);
+    const hi = quantileApprox(grid, 0.99);
+    const bins = 60;
+
+    const counts = new Uint32Array(bins);
+    const inv = bins / (hi - lo || 1);
+    for (let i=0;i<grid.length;i++){
+      const v = grid[i];
+      if (v<lo || v>hi) continue;
+      const b = Math.max(0, Math.min(bins-1, Math.floor((v - lo) * inv)));
+      counts[b]++;
+    }
+    let maxC = 1;
+    for (let i=0;i<bins;i++) if (counts[i]>maxC) maxC = counts[i];
+
+    const ax = drawPlotAxes(ctxHi, w, h, {
+      title: "Histogram (clipped 1–99%)",
+      xlabel: "Height (µm)",
+      ylabel: "Count"
+    });
+
+    const axis = "#111827";
+    const x0 = ax.padL, x1 = w - ax.padR;
+    const y0 = h - ax.padB, y1 = ax.padT;
+
+    const bw = (x1-x0) / bins;
+    for (let i=0;i<bins;i++){
+      const x = x0 + i*bw;
+      const barH = (y0-y1) * (counts[i] / maxC);
+      ctxHi.fillStyle = "#cfd6e4";
+      ctxHi.fillRect(x, y0 - barH, Math.max(1, bw-1), barH);
+      ctxHi.strokeStyle = axis;
+      ctxHi.lineWidth = 1;
+      ctxHi.strokeRect(x, y0 - barH, Math.max(1, bw-1), barH);
+    }
+
+    ctxHi.fillStyle = axis;
+    ctxHi.font = "600 12px system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif";
+    ctxHi.textAlign = "left";
+    ctxHi.fillText(`display range: [${fmt(lo)}, ${fmt(hi)}] µm`, ax.padL, h-ax.padB+18);
+
+    histInfo.textContent = `${proc.W}×${proc.W} shown`;
+  }
+
+  // =========================
+  // Metrics
+  // =========================
+  function updateMetrics(){
+    if (!Z || !metricsBody){
+      if (metricsBody) metricsBody.innerHTML = "";
+      if (metricsMeta) metricsMeta.textContent = "No data loaded.";
+      metricsSa = null;
+      return;
+    }
+    let sumAbs = 0, sumSq = 0, sumCube = 0, sum4 = 0;
+    for (let i=0;i<Z.length;i++){
+      const d = Z[i] - zMean;
+      sumAbs += Math.abs(d);
+      sumSq += d*d;
+      sumCube += d*d*d;
+      sum4 += d*d*d*d;
+    }
+    const Sa = sumAbs / Z.length;
+    const Sq = Math.sqrt(sumSq / Z.length);
+    const Sz = zMax - zMin;
+    const Ssk = (zStd > 0) ? ((sumCube / Z.length) / (zStd*zStd*zStd)) : NaN;
+    const Sku = (zStd > 0) ? ((sum4 / Z.length) / (zStd*zStd*zStd*zStd)) : NaN;
+
+    // Cache Sa for the help modal
+    metricsSa = Sa;
+
+    if (metricsMeta){
+      const demeanLabel = el("demean")?.checked ? "On" : "Off";
+      const dsLabel = el("ds")?.value ? `${el("ds").value}×` : "—";
+      const s = getLateralScale();
+      const xyLabel = (s.hasX || s.hasY)
+        ? ` • X length: ${s.hasX ? fmt(s.Lx) : "—"} µm • Y length: ${s.hasY ? fmt(s.Ly) : "—"} µm`
+        : "";
+      metricsMeta.textContent = `Source: ${dataLabel} • Grid: ${N}×${N} (${(Z.length).toLocaleString()} pts) • Downsample: ${dsLabel} • Demean (plots): ${demeanLabel}${xyLabel}`;
+    }
+
+    const rows = [
+      { metric: "Minimum height", symbol: "z_min", value: fmt(zMin), unit: "µm" },
+      { metric: "Maximum height", symbol: "z_max", value: fmt(zMax), unit: "µm" },
+      { metric: "Mean height", symbol: "z̄", value: fmt(zMean), unit: "µm" },
+      { metric: "Standard deviation", symbol: "σ", value: fmt(zStd), unit: "µm" },
+      { metric: "Arithmetic mean roughness", symbol: "Sa", value: fmt(Sa), unit: "µm" },
+      { metric: "RMS roughness", symbol: "Sq", value: fmt(Sq), unit: "µm" },
+      { metric: "Peak-to-valley (max−min)", symbol: "Sz", value: fmt(Sz), unit: "µm" },
+      { metric: "Skewness", symbol: "Ssk", value: fmt(Ssk), unit: "—" },
+      { metric: "Kurtosis", symbol: "Sku", value: fmt(Sku), unit: "—" }
+    ];
+
+    metricsBody.innerHTML = rows.map(r =>
+      `<tr>
+        <td>${r.metric}</td>
+        <td class="sym">${r.symbol}</td>
+        <td class="num mono">${r.value}</td>
+        <td>${r.unit}</td>
+      </tr>`
+    ).join("");
+  }
+
+  // =========================
+  // Plotly 3D (publication ready)
+  // =========================
+  const ZSCALE_OPTIONS = [
+    0.5, 0.8, 1.0,
+    2.0, 3.0, 4.0, 5.0
+  ];
+
+  let zAxisMultTouched = false;
+  let zAxisMaxTouched = false;
+  let zAxisSyncing = false;
+  let zAxisBaseMaxAbs = 1e-12; // current dataset amplitude (µm)
+  let desiredZMaxUm = null;    // effective displayed Zmax (µm)
+  let desiredZMult = 1.0;      // desired multiplier when using the buttons
+
+  function clamp(v, lo, hi){ return Math.max(lo, Math.min(hi, v)); }
+
+  function nearestZScaleIndex(mult){
+    if (!Number.isFinite(mult) || mult <= 0) return ZSCALE_OPTIONS.indexOf(1.0);
+    let bestIdx = 0;
+    let bestErr = Infinity;
+    for (let i=0;i<ZSCALE_OPTIONS.length;i++){
+      const opt = ZSCALE_OPTIONS[i];
+      const err = Math.abs(opt - mult);
+      if (err < bestErr){ bestErr = err; bestIdx = i; }
+    }
+    return bestIdx;
+  }
+
+  function getZMultButtons(){
+    const g = el("zMultGroup");
+    if (!g) return [];
+    return Array.from(g.querySelectorAll("button[data-mult]"));
+  }
+
+  function formatMultLabel(mult){
+    if (!Number.isFinite(mult) || mult <= 0) return "—×";
+    // Keep presets looking clean; show up to 3 decimals for custom multipliers.
+    const nearInt = Math.abs(mult - Math.round(mult)) < 1e-12;
+    const v = nearInt ? Math.round(mult).toFixed(1) : mult.toFixed(3).replace(/0+$/,"" ).replace(/\.$/, "");
+    return `${v}×`;
+  }
+
+  function multNearlyEqual(a, b){
+    if (!Number.isFinite(a) || !Number.isFinite(b)) return false;
+    const scale = Math.max(1, Math.abs(a), Math.abs(b));
+    return Math.abs(a - b) <= 1e-9 * scale;
+  }
+
+  function ensureCustomZMultButton(mult){
+    const g = el("zMultGroup");
+    if (!g) return;
+
+    // If the multiplier is basically one of our presets, remove any custom button.
+    const isPreset = ZSCALE_OPTIONS.some(m => multNearlyEqual(m, mult));
+    const existing = g.querySelector("#zMultCustom");
+    if (isPreset){
+      existing?.remove();
+      return;
+    }
+
+    const label = formatMultLabel(mult);
+    if (existing){
+      existing.dataset.mult = String(mult);
+      existing.textContent = label;
+      return;
+    }
+
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.id = "zMultCustom";
+    btn.className = "toggleBtn";
+    btn.dataset.mult = String(mult);
+    btn.textContent = label;
+    btn.setAttribute("aria-pressed", "false");
+    btn.title = "Custom multiplier (from typed Z-axis max)";
+
+    // Put custom button at the end so presets remain in a stable order.
+    g.appendChild(btn);
+  }
+
+  function setActiveZMultButton(mult){
+    const btns = getZMultButtons();
+    for (const b of btns){
+      const m = Number(b.dataset.mult);
+      const active = Number.isFinite(m) && multNearlyEqual(m, mult);
+      b.classList.toggle("active", active);
+      b.setAttribute("aria-pressed", active ? "true" : "false");
+    }
+  }
+
+  function applyDesiredZMaxToControls(){
+    const num = el("zmaxNum");
+    const label = el("zscaleVal");
+    if (!num) return;
+
+    if (!Number.isFinite(zAxisBaseMaxAbs) || zAxisBaseMaxAbs <= 0) zAxisBaseMaxAbs = 1e-12;
+
+    // Establish a desired effective Zmax if none yet.
+    if (!Number.isFinite(desiredZMaxUm) || desiredZMaxUm === null){
+      desiredZMult = 1.0;
+      desiredZMaxUm = zAxisBaseMaxAbs; // default to 1×
+    }
+
+    // Two modes:
+    // - Multiplier mode: user clicked a multiplier button -> Zmax follows amplitude * multiplier.
+    // - Absolute mode: user typed Zmax -> multiplier becomes whatever yields that exact Zmax.
+    let mult = 1.0;
+    let effectiveZMax = zAxisBaseMaxAbs;
+
+    if (zAxisMaxTouched){
+      effectiveZMax = Math.max(1e-12, desiredZMaxUm);
+      mult = effectiveZMax / zAxisBaseMaxAbs;
+      ensureCustomZMultButton(mult);
+    } else {
+      mult = Number.isFinite(desiredZMult) && desiredZMult > 0 ? desiredZMult : 1.0;
+      effectiveZMax = Math.max(1e-12, zAxisBaseMaxAbs * mult);
+      ensureCustomZMultButton(mult);
+    }
+
+    zAxisSyncing = true;
+    try{
+      setActiveZMultButton(mult);
+      num.value = String(effectiveZMax);
+      if (label) label.textContent = formatMultLabel(mult);
+    } finally {
+      zAxisSyncing = false;
+    }
+
+    // Update stored desired to the actual effective Zmax we can represent.
+    desiredZMaxUm = effectiveZMax;
+    desiredZMult = mult;
+  }
+
+  function syncZAxisControls(proc){
+    zAxisBaseMaxAbs = Math.max(1e-12, Math.max(Math.abs(proc.lo), Math.abs(proc.hi)) || 1e-12);
+
+    // If the user hasn't interacted, stay at 1× (i.e., zmax equals data amplitude).
+    if (!zAxisMultTouched && !zAxisMaxTouched){
+      desiredZMult = 1.0;
+      desiredZMaxUm = zAxisBaseMaxAbs;
+    } else if (zAxisMultTouched && !zAxisMaxTouched){
+      // Preserve the selected multiplier across changes in dataset amplitude.
+      desiredZMaxUm = Math.max(1e-12, zAxisBaseMaxAbs * desiredZMult);
+    }
+
+    applyDesiredZMaxToControls();
+  }
+
+  function renderPlotly(proc){
+    const { grid, W, lo, hi, demean } = proc;
+    const zMaxUm = Math.max(1e-12, Number(el("zmaxNum")?.value) || 1e-12);
+
+    const s = getLateralScale();
+    const hasXY = s.hasX && s.hasY;
+    const xVec = hasXY ? Array.from({ length: W }, (_, i) => (W <= 1 ? 0 : (i * (s.Lx / (W - 1))))) : null;
+    const yVec = hasXY ? Array.from({ length: W }, (_, i) => (W <= 1 ? 0 : (i * (s.Ly / (W - 1))))) : null;
+
+    const z = [];
+    for (let y=0;y<W;y++){
+      const row = [];
+      const off = y*W;
+      for (let x=0;x<W;x++){
+        row.push(grid[off + x]);
+      }
+      z.push(row);
+    }
+
+    const cm = plotlyColorscale(el("cmap").value);
+
+    const trace = {
+      type: "surface",
+      z,
+      colorscale: cm,
+      cmin: lo,
+      cmax: hi,
+      showscale: true,
+      lighting: { ambient:0.55, diffuse:0.65, specular:0.25, roughness:0.9, fresnel:0.1 },
+      lightposition: { x:1.2, y:1.4, z:1.8 }
+    };
+
+    if (hasXY){
+      trace.x = xVec;
+      trace.y = yVec;
+    }
+
+    const data = [trace];
+
+    const axisCommon = {
+      showgrid: true,
+      gridcolor: "#e5e7eb",
+      zeroline: false,
+      showline: true,
+      linecolor: "#111827",
+      ticks: "outside",
+      tickcolor: "#111827",
+      tickfont: { color:"#111827", size:11 },
+      titlefont: { color:"#111827", size:12 },
+      color: "#111827"
+    };
+
+    const baseMaxAbs = Math.max(Math.abs(lo), Math.abs(hi)) || 1e-12;
+    const useSym = !!demean || (lo < 0 && hi > 0);
+    const zRange = useSym
+      ? [-zMaxUm, zMaxUm]
+      : [Math.min(lo, zMaxUm), Math.max(hi, zMaxUm)];
+
+    const layout = {
+      margin:{l:0,r:0,b:0,t:0},
+      paper_bgcolor:"#ffffff",
+      plot_bgcolor:"#ffffff",
+      font: { color:"#111827", family:"system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif" },
+      scene:{
+        xaxis:{ ...axisCommon, title: hasXY ? "x (µm)" : "x (index)" },
+        yaxis:{ ...axisCommon, title: hasXY ? "y (µm)" : "y (index)" },
+        zaxis:{ ...axisCommon, title:"height (µm)", range: zRange },
+        bgcolor:"#ffffff",
+        aspectmode:"manual",
+        // Keep the 3D box proportions constant so increasing Z-axis max flattens the surface
+        // without physically compressing the Z axis.
+        aspectratio:{ x:1, y:1, z:1 }
+      }
+    };
+
+    Plotly.react("plotly3d", data, layout, { displayModeBar:false, responsive:true });
+  }
+
+  // =========================
+  // WebGL true 3D mesh + lighting
+  // =========================
+  const Mat = {
+    ident: () => [1,0,0,0,  0,1,0,0,  0,0,1,0,  0,0,0,1],
+    mul: (a,b) => {
+      const r = new Array(16).fill(0);
+      for (let i=0;i<4;i++){
+        for (let j=0;j<4;j++){
+          for (let k=0;k<4;k++) r[i*4+j] += a[i*4+k]*b[k*4+j];
+        }
+      }
+      return r;
+    },
+    persp: (fovy, aspect, near, far) => {
+      const f = 1/Math.tan(fovy/2);
+      const nf = 1/(near - far);
+      return [
+        f/aspect,0,0,0,
+        0,f,0,0,
+        0,0,(far+near)*nf,-1,
+        0,0,(2*far*near)*nf,0
+      ];
+    },
+    lookAt: (eye, center, up) => {
+      const ex=eye[0], ey=eye[1], ez=eye[2];
+      const cx=center[0], cy=center[1], cz=center[2];
+      let zx = ex-cx, zy = ey-cy, zz = ez-cz;
+      const zlen = Math.hypot(zx,zy,zz) || 1;
+      zx/=zlen; zy/=zlen; zz/=zlen;
+
+      let xx = up[1]*zz - up[2]*zy;
+      let xy = up[2]*zx - up[0]*zz;
+      let xz = up[0]*zy - up[1]*zx;
+      const xlen = Math.hypot(xx,xy,xz) || 1;
+      xx/=xlen; xy/=xlen; xz/=xlen;
+
+      let yx = zy*xz - zz*xy;
+      let yy = zz*xx - zx*xz;
+      let yz = zx*xy - zy*xx;
+
+      return [
+        xx,yx,zx,0,
+        xy,yy,zy,0,
+        xz,yz,zz,0,
+        -(xx*ex + xy*ey + xz*ez),
+        -(yx*ex + yy*ey + yz*ez),
+        -(zx*ex + zy*ey + zz*ez),
+        1
+      ];
+    }
+  };
+
+  function webglInit(){
+    webgl = el("webgl3d");
+    gl =
+      webgl.getContext("webgl2", { antialias:true, preserveDrawingBuffer:true }) ||
+      webgl.getContext("webgl", { antialias:true, preserveDrawingBuffer:true });
+    if (!gl){
+      warn.innerHTML = `<span class="err">WebGL not supported in zxthis browser.</span>`;
+      return false;
+    }
+
+    isWebGL2 = (typeof WebGL2RenderingContext !== "undefined") && (gl instanceof WebGL2RenderingContext);
+    hasUint32ElementIndex = isWebGL2 ? true : !!gl.getExtension("OES_element_index_uint");
+
+    const vs = `
+      attribute vec3 aPos;
+      attribute vec3 aNor;
+      attribute vec3 aCol;
+
+      uniform mat4 uMVP;
+      uniform mat4 uModel;
+      uniform mat3 uNMat;
+
+      varying vec3 vPos;
+      varying vec3 vNor;
+      varying vec3 vCol;
+
+      void main(){
+        vec4 wp = uModel * vec4(aPos, 1.0);
+        vPos = wp.xyz;
+        vNor = normalize(uNMat * aNor);
+        vCol = aCol;
+        gl_Position = uMVP * vec4(aPos, 1.0);
+      }
+    `;
+
+    const fs = `
+      precision mediump float;
+      varying vec3 vPos;
+      varying vec3 vNor;
+      varying vec3 vCol;
+
+      uniform bool uLighting;
+      uniform vec3 uLightDir;
+      uniform vec3 uEye;
+      uniform float uAmb;
+      uniform float uDif;
+      uniform float uSpec;
+      uniform float uShin;
+
+      void main(){
+        vec3 base = vCol;
+        if(!uLighting){
+          gl_FragColor = vec4(base, 1.0);
+          return;
+        }
+        vec3 N = normalize(vNor);
+        vec3 L = normalize(-uLightDir);
+        float ndl = max(dot(N, L), 0.0);
+
+        vec3 V = normalize(uEye - vPos);
+        vec3 H = normalize(L + V);
+        float spec = pow(max(dot(N, H), 0.0), uShin);
+
+        float a = uAmb;
+        float d = uDif * ndl;
+        float s = uSpec * spec;
+
+        vec3 col = base * (a + d) + vec3(s);
+        col = clamp(col, 0.0, 1.0);
+        gl_FragColor = vec4(col, 1.0);
+      }
+    `;
+
+    function compile(type, src){
+      const sh = gl.createShader(type);
+      gl.shaderSource(sh, src);
+      gl.compileShader(sh);
+      if (!gl.getShaderParameter(sh, gl.COMPILE_STATUS)){
+        throw new Error(gl.getShaderInfoLog(sh) || "Shader compile error");
+      }
+      return sh;
+    }
+
+    try{
+      const vsh = compile(gl.VERTEX_SHADER, vs);
+      const fsh = compile(gl.FRAGMENT_SHADER, fs);
+      prog = gl.createProgram();
+      gl.attachShader(prog, vsh);
+      gl.attachShader(prog, fsh);
+      gl.linkProgram(prog);
+      if (!gl.getProgramParameter(prog, gl.LINK_STATUS)){
+        throw new Error(gl.getProgramInfoLog(prog) || "Program link error");
+      }
+      gl.useProgram(prog);
+      gl.enable(gl.DEPTH_TEST);
+      gl.clearColor(1,1,1,1);
+    } catch(err){
+      warn.innerHTML = `<span class="err">WebGL init failed:</span> ${err.message}`;
+      console.error(err);
+      return false;
+    }
+
+    // Interaction
+    webgl.addEventListener("mousedown", (e) => { drag.on = true; drag.x = e.clientX; drag.y = e.clientY; });
+    window.addEventListener("mouseup", () => drag.on = false);
+    window.addEventListener("mousemove", (e) => {
+      if (!drag.on) return;
+      const dx = (e.clientX - drag.x) / 180;
+      const dy = (e.clientY - drag.y) / 180;
+      drag.x = e.clientX; drag.y = e.clientY;
+      cam.yaw += dx;
+      cam.pitch += dy;
+      cam.pitch = Math.max(-1.45, Math.min(1.45, cam.pitch));
+      needsRedraw = true;
+      drawWebGL();
+    });
+    webgl.addEventListener("wheel", (e) => {
+      e.preventDefault();
+      cam.dist *= (e.deltaY > 0 ? 1.08 : 0.92);
+      cam.dist = Math.max(0.8, Math.min(12, cam.dist));
+      needsRedraw = true;
+      drawWebGL();
+    }, { passive:false });
+
+    webgl.addEventListener("dblclick", () => {
+      cam = { yaw:-0.8, pitch:0.65, dist:2.8, target:[0,0,0] };
+      needsRedraw = true;
+      drawWebGL();
+    });
+
+    return true;
+  }
+
+  function buildMesh(proc){
+    const { grid, W, lo, hi } = proc;
+    const zMaxUm = Math.max(1e-12, Number(el("zmaxNum")?.value) || 1e-12);
+    const baseMaxAbs = Math.max(Math.abs(lo), Math.abs(hi)) || 1e-12;
+    const zGeomScale = baseMaxAbs / zMaxUm;
+    const cmap = getCmap();
+    const inv = 1 / (hi - lo || 1);
+
+    const V = W*W;
+    const needsUint32 = V > 65535;
+    const IndexArray = needsUint32 ? Uint32Array : Uint16Array;
+    const pos = new Float32Array(V*3);
+    const nor = new Float32Array(V*3);
+    const col = new Float32Array(V*3);
+
+    const idx = (x,y) => y*W + x;
+
+    for (let y=0;y<W;y++){
+      const fy = (y/(W-1))*2 - 1;
+      for (let x=0;x<W;x++){
+        const fx = (x/(W-1))*2 - 1;
+        const k = idx(x,y);
+        const z = grid[k] * zGeomScale;
+
+        pos[k*3+0] = fx;
+        pos[k*3+1] = fy;
+        pos[k*3+2] = z;
+
+        const t = clamp01((grid[k] - lo)*inv);
+        const [r,g,b] = cmap(t);
+        col[k*3+0] = (r/255);
+        col[k*3+1] = (g/255);
+        col[k*3+2] = (b/255);
+      }
+    }
+
+    // normals
+    for (let y=0;y<W;y++){
+      for (let x=0;x<W;x++){
+        const xm = Math.max(0, x-1), xp = Math.min(W-1, x+1);
+        const ym = Math.max(0, y-1), yp = Math.min(W-1, y+1);
+
+        const zL = pos[idx(xm,y)*3+2];
+        const zR = pos[idx(xp,y)*3+2];
+        const zD = pos[idx(x,ym)*3+2];
+        const zU = pos[idx(x,yp)*3+2];
+
+        const sx = 2/(W-1);
+        const sy = 2/(W-1);
+
+        const dzdx = (zR - zL) / (2*sx);
+        const dzdy = (zU - zD) / (2*sy);
+
+        let nx = -dzdx, ny = -dzdy, nz = 1.0;
+        const l = Math.hypot(nx,ny,nz) || 1;
+        nx/=l; ny/=l; nz/=l;
+
+        const k = idx(x,y);
+        nor[k*3+0] = nx;
+        nor[k*3+1] = ny;
+        nor[k*3+2] = nz;
+      }
+    }
+
+    // triangles
+    const tris = (W-1)*(W-1)*2;
+    const ind = new IndexArray(tris*3);
+    let p = 0;
+    for (let y=0;y<W-1;y++){
+      for (let x=0;x<W-1;x++){
+        const a = idx(x,y);
+        const b = idx(x+1,y);
+        const c = idx(x,y+1);
+        const d = idx(x+1,y+1);
+        ind[p++] = a; ind[p++] = c; ind[p++] = b;
+        ind[p++] = b; ind[p++] = c; ind[p++] = d;
+      }
+    }
+
+    // wireframe
+    const lines = [];
+    for (let y=0;y<W;y++) for (let x=0;x<W-1;x++) lines.push(idx(x,y), idx(x+1,y));
+    for (let x=0;x<W;x++) for (let y=0;y<W-1;y++) lines.push(idx(x,y), idx(x,y+1));
+    const lind = new IndexArray(lines);
+
+    return { W, pos, nor, col, ind, lind, indexType: needsUint32 ? "u32" : "u16" };
+  }
+
+  function uploadMeshToGPU(m){
+    if (!gl || !prog) return null;
+
+    const needsUint32 = (m.indexType === "u32");
+    if (needsUint32 && !hasUint32ElementIndex){
+      warn.innerHTML = `<span class="err">WebGL limitation:</span> this mesh needs 32-bit indices. Increase Downsample (so the shown grid is \u2264 255\u00d7255), or use a WebGL2-capable browser/device.`;
+      return null;
+    }
+
+    function bufData(target, data, usage=gl.STATIC_DRAW){
+      const b = gl.createBuffer();
+      gl.bindBuffer(target, b);
+      gl.bufferData(target, data, usage);
+      return b;
+    }
+
+    const bPos = bufData(gl.ARRAY_BUFFER, m.pos);
+    const bNor = bufData(gl.ARRAY_BUFFER, m.nor);
+    const bCol = bufData(gl.ARRAY_BUFFER, m.col);
+    const bInd = bufData(gl.ELEMENT_ARRAY_BUFFER, m.ind);
+    const bLin = bufData(gl.ELEMENT_ARRAY_BUFFER, m.lind);
+
+    const aPos = gl.getAttribLocation(prog, "aPos");
+    const aNor = gl.getAttribLocation(prog, "aNor");
+    const aCol = gl.getAttribLocation(prog, "aCol");
+
+    const glIndexEnum = needsUint32 ? gl.UNSIGNED_INT : gl.UNSIGNED_SHORT;
+
+    return { ...m, bPos, bNor, bCol, bInd, bLin, aPos, aNor, aCol, glIndexEnum };
+  }
+
+  function nmatFromModel(model){
+    const m = model;
+    const a00=m[0], a01=m[1], a02=m[2];
+    const a10=m[4], a11=m[5], a12=m[6];
+    const a20=m[8], a21=m[9], a22=m[10];
+
+    const b01 = a22*a11 - a12*a21;
+    const b11 = -a22*a10 + a12*a20;
+    const b21 = a21*a10 - a11*a20;
+
+    let det = a00*b01 + a01*b11 + a02*b21;
+    if (Math.abs(det) < 1e-12) det = 1e-12;
+    const invDet = 1.0 / det;
+
+    const r00 = b01 * invDet;
+    const r01 = (-a22*a01 + a02*a21) * invDet;
+    const r02 = (a12*a01 - a02*a11) * invDet;
+    const r10 = b11 * invDet;
+    const r11 = (a22*a00 - a02*a20) * invDet;
+    const r12 = (-a12*a00 + a02*a10) * invDet;
+    const r20 = b21 * invDet;
+    const r21 = (-a21*a00 + a01*a20) * invDet;
+    const r22 = (a11*a00 - a01*a10) * invDet;
+
+    return [
+      r00, r10, r20,
+      r01, r11, r21,
+      r02, r12, r22
+    ];
+  }
+
+  function drawWebGL(){
+    if (!webgl || !gl || !prog || !mesh) return;
+    if (!needsRedraw) return;
+    // WebGL UI was removed (Plotly-only). Guard in case this is ever called.
+    if (!document.getElementById("lighting") || !document.getElementById("wireframe")) return;
+
+    gl.viewport(0,0,webgl.width,webgl.height);
+    gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+    gl.useProgram(prog);
+
+    gl.bindBuffer(gl.ARRAY_BUFFER, mesh.bPos);
+    gl.enableVertexAttribArray(mesh.aPos);
+    gl.vertexAttribPointer(mesh.aPos, 3, gl.FLOAT, false, 0, 0);
+
+    gl.bindBuffer(gl.ARRAY_BUFFER, mesh.bNor);
+    gl.enableVertexAttribArray(mesh.aNor);
+    gl.vertexAttribPointer(mesh.aNor, 3, gl.FLOAT, false, 0, 0);
+
+    gl.bindBuffer(gl.ARRAY_BUFFER, mesh.bCol);
+    gl.enableVertexAttribArray(mesh.aCol);
+    gl.vertexAttribPointer(mesh.aCol, 3, gl.FLOAT, false, 0, 0);
+
+    const aspect = webgl.width / webgl.height;
+    const P = Mat.persp(55*Math.PI/180, aspect, 0.05, 50);
+
+    const cx = cam.target[0], cy = cam.target[1], cz = cam.target[2];
+    const ex = cx + cam.dist * Math.cos(cam.pitch) * Math.cos(cam.yaw);
+    const ey = cy + cam.dist * Math.cos(cam.pitch) * Math.sin(cam.yaw);
+    const ez = cz + cam.dist * Math.sin(cam.pitch);
+    const eye = [ex,ey,ez];
+
+    const V = Mat.lookAt(eye, cam.target, [0,0,1]);
+    const M = Mat.ident();
+    const MVP = Mat.mul(P, V);
+
+    const uMVP = gl.getUniformLocation(prog, "uMVP");
+    const uModel = gl.getUniformLocation(prog, "uModel");
+    const uNMat = gl.getUniformLocation(prog, "uNMat");
+    const uLighting = gl.getUniformLocation(prog, "uLighting");
+    const uLightDir = gl.getUniformLocation(prog, "uLightDir");
+    const uEye = gl.getUniformLocation(prog, "uEye");
+    const uAmb = gl.getUniformLocation(prog, "uAmb");
+    const uDif = gl.getUniformLocation(prog, "uDif");
+    const uSpec = gl.getUniformLocation(prog, "uSpec");
+    const uShin = gl.getUniformLocation(prog, "uShin");
+
+    gl.uniformMatrix4fv(uMVP, false, new Float32Array(MVP));
+    gl.uniformMatrix4fv(uModel, false, new Float32Array(M));
+    gl.uniformMatrix3fv(uNMat, false, new Float32Array(nmatFromModel(M)));
+
+    gl.uniform1i(uLighting, el("lighting").checked ? 1 : 0);
+
+    let lx = Number(el("lx").value), ly = Number(el("ly").value), lz = Number(el("lz").value);
+    const ll = Math.hypot(lx,ly,lz) || 1;
+    lx/=ll; ly/=ll; lz/=ll;
+    gl.uniform3f(uLightDir, lx, ly, lz);
+
+    gl.uniform3f(uEye, eye[0], eye[1], eye[2]);
+    gl.uniform1f(uAmb, Number(el("amb").value));
+    gl.uniform1f(uDif, Number(el("dif").value));
+    gl.uniform1f(uSpec, Number(el("spec").value));
+    gl.uniform1f(uShin, Number(el("shin").value));
+
+    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, mesh.bInd);
+    gl.drawElements(gl.TRIANGLES, mesh.ind.length, mesh.glIndexEnum, 0);
+
+    if (el("wireframe").checked){
+      gl.disable(gl.DEPTH_TEST);
+      gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, mesh.bLin);
+      gl.drawElements(gl.LINES, mesh.lind.length, mesh.glIndexEnum, 0);
+      gl.enable(gl.DEPTH_TEST);
+    }
+
+    needsRedraw = false;
+  }
+
+  // =========================
+  // Render pipeline
+  // =========================
+  function renderAll(){
+    warn.textContent = "";
+    if (!Z){
+      status.textContent = "No data loaded.";
+      return;
+    }
+
+    const proc = getProcessedGrid();
+    if (!proc) return;
+
+    if (el("rangeMode").value !== "manual"){
+      el("minv").value = proc.lo;
+      el("maxv").value = proc.hi;
+    }
+
+    renderHeatmap(proc);
+    renderHistogram(proc);
+    if (lastProfile) renderProfile(lastProfile.kind, lastProfile.idx);
+
+    const shown = proc.W;
+    const displayedPts = shown*shown;
+    status.innerHTML = `Loaded <strong>${N}×${N}</strong> • showing <strong>${shown}×${shown}</strong> (${displayedPts.toLocaleString()} pts) • range [${fmt(proc.lo)}, ${fmt(proc.hi)}] µm • ${proc.demean ? "demeaned" : "raw"}`;
+
+    syncZAxisControls(proc);
+
+    renderPlotly(proc);
+
+    // Make plotly responsive if its tab is visible (or just after render)
+    try{ Plotly.Plots.resize("plotly3d"); } catch {}
+
+  }
+
+  // =========================
+  // Heatmap click -> profile
+  // =========================
+  heat.addEventListener("click", (e) => {
+    if (!Z) return;
+    const rect = heat.getBoundingClientRect();
+    const x = Math.floor((e.clientX - rect.left) / rect.width * heat.width);
+    const y = Math.floor((e.clientY - rect.top) / rect.height * heat.height);
+
+    const ds = Number(el("ds").value);
+    const xi = Math.max(0, Math.min(N-1, x*ds));
+    const yi = Math.max(0, Math.min(N-1, y*ds));
+
+    let z = Z[yi*N + xi];
+    if (el("demean").checked) z -= zMean;
+
+    const s = getLateralScale();
+    const xPart = s.hasX ? `x=${xi} (${fmt(xi * s.dx)} µm)` : `x=${xi}`;
+    const yPart = s.hasY ? `y=${yi} (${fmt(yi * s.dy)} µm)` : `y=${yi}`;
+    clickInfo.textContent = `${xPart}, ${yPart}, z=${fmt(z)} µm`;
+
+    // Ensure 2D tab is visible for immediate feedback
+    if (!tab2d.classList.contains("active")) setTab("2d");
+
+    if (e.shiftKey) renderProfile("col", xi);
+    else renderProfile("row", yi);
+  });
+
+  // =========================
+  // Buttons & controls
+  // =========================
+  async function loadCsvFile(f){
+    if (!f) return;
+    try{
+      dataLabel = f.name;
+      const text = await f.text();
+      const parsed = parseGrid(text);
+      Z = parsed.data;
+      N = parsed.n;
+
+      updateLateralScaleInfo();
+
+      const st = computeStats(Z);
+      zMin = st.mn; zMax = st.mx; zMean = st.mean; zStd = st.std;
+
+      updateMetrics();
+      lastProfile = null;
+      clickInfo.textContent = "";
+      profileInfo.textContent = "";
+      histInfo.textContent = "";
+
+      updateRangeInputsForMode();
+      status.textContent = `Loaded ${N}×${N}. Click Render.`;
+
+      if (fileFeedback){
+        fileFeedback.classList.remove("err");
+        fileFeedback.classList.add("ok");
+        const delimLabel = (parsed.delim === "\t") ? "TAB" : (parsed.delim === ",") ? "comma" : "space";
+        fileFeedback.textContent = `Loaded: ${f.name} • ${N}×${N} • delimiter: ${delimLabel} • rendering…`;
+      }
+      // default to 2D after load
+      setTab("2d");
+
+      // Auto-render after upload
+      renderAll();
+      if (fileFeedback){
+        const delimLabel = (parsed.delim === "\t") ? "TAB" : (parsed.delim === ",") ? "comma" : "space";
+        fileFeedback.textContent = `Loaded: ${f.name} • ${N}×${N} • delimiter: ${delimLabel} • rendered`;
+      }
+    } catch(err){
+      status.innerHTML = `<span class="err">Failed:</span> ${err.message}`;
+      console.error(err);
+
+      if (fileFeedback){
+        fileFeedback.classList.remove("ok");
+        fileFeedback.classList.add("err");
+        fileFeedback.textContent = `Load failed: ${err.message}`;
+      }
+    }
+  }
+
+  const fileInput = el("file");
+  const fileDrop = el("fileDrop");
+
+  fileInput?.addEventListener("change", async (e) => {
+    const f = e.target.files?.[0];
+    await loadCsvFile(f);
+  });
+
+  if (fileDrop && fileInput){
+    fileDrop.addEventListener("click", (e) => {
+      if (e.target === fileInput) return;
+      fileInput.click();
+    });
+    fileDrop.addEventListener("keydown", (e) => {
+      if (e.key === "Enter" || e.key === " "){
+        e.preventDefault();
+        fileInput.click();
+      }
+    });
+    const stop = (e) => { e.preventDefault(); e.stopPropagation(); };
+    ["dragenter","dragover","dragleave","drop"].forEach(ev => fileDrop.addEventListener(ev, stop));
+    ["dragenter","dragover"].forEach(ev => fileDrop.addEventListener(ev, () => fileDrop.classList.add("dragover")));
+    ["dragleave","drop"].forEach(ev => fileDrop.addEventListener(ev, () => fileDrop.classList.remove("dragover")));
+    fileDrop.addEventListener("drop", async (e) => {
+      const f = e.dataTransfer?.files?.[0];
+      if (!f) return;
+      // Keep the input in sync when possible
+      try{
+        const dt = new DataTransfer();
+        dt.items.add(f);
+        fileInput.files = dt.files;
+      } catch {}
+      await loadCsvFile(f);
+    });
+  }
+
+  function loadDemoData(){
+    dataLabel = "DEMO";
+    const size = 512;
+    N = size;
+    Z = new Float64Array(size*size);
+    updateLateralScaleInfo();
+    for (let y=0;y<size;y++){
+      for (let x=0;x<size;x++){
+        const r = Math.hypot(x-256, y-256)/256;
+        const v = 1.6e-4*Math.sin(10*r) + 6e-5*Math.sin(x/17) + 4e-5*Math.cos(y/23) + (Math.random()-0.5)*4e-5;
+        Z[y*size + x] = v * Z_INPUT_TO_UM;
+      }
+    }
+    const st = computeStats(Z);
+    zMin = st.mn; zMax = st.mx; zMean = st.mean; zStd = st.std;
+
+    updateMetrics();
+    lastProfile = null;
+    clickInfo.textContent = "";
+    profileInfo.textContent = "";
+    histInfo.textContent = "";
+    updateRangeInputsForMode();
+    status.textContent = `Loaded DEMO ${N}×${N}. Click Render.`;
+
+    if (fileFeedback){
+      fileFeedback.classList.remove("err");
+      fileFeedback.classList.add("ok");
+      fileFeedback.textContent = `Loaded: DEMO • ${N}×${N} • rendering…`;
+    }
+    setTab("2d");
+
+    // Auto-render demo
+    renderAll();
+    if (fileFeedback){
+      fileFeedback.textContent = `Loaded: DEMO • ${N}×${N} • rendered`;
+    }
+  }
+
+  el("reset")?.addEventListener("click", () => openResetDialog());
+
+  el("rangeMode").addEventListener("change", () => { updateRangeInputsForMode(); if (Z) renderAll(); });
+  el("demean").addEventListener("change", () => { updateRangeInputsForMode(); if (Z) renderAll(); });
+  el("ds").addEventListener("change", () => { if (Z) renderAll(); });
+  el("cmap").addEventListener("change", () => { if (Z) renderAll(); });
+
+  // Manual min/max range should re-render when edited.
+  el("minv")?.addEventListener("change", () => { if (Z && el("rangeMode")?.value === "manual") renderAll(); });
+  el("maxv")?.addEventListener("change", () => { if (Z && el("rangeMode")?.value === "manual") renderAll(); });
+  el("zMultGroup")?.addEventListener("click", (e) => {
+    const btn = e.target?.closest?.("button[data-mult]");
+    if (!btn) return;
+    if (zAxisSyncing) return;
+
+    const mult = Number(btn.dataset.mult);
+    if (!Number.isFinite(mult) || mult <= 0) return;
+
+    zAxisMultTouched = true;
+    zAxisMaxTouched = false;
+    desiredZMult = mult;
+    desiredZMaxUm = Math.max(1e-12, zAxisBaseMaxAbs * mult);
+    applyDesiredZMaxToControls();
+    if (Z) renderAll();
+  });
+
+  el("zmaxNum").addEventListener("change", () => {
+    const num = el("zmaxNum");
+    if (!num) return;
+
+    let v = Number(num.value);
+    if (!Number.isFinite(v) || v <= 0){
+      v = 1e-12;
+    }
+    zAxisMaxTouched = true;
+    // Treat manual entry as an absolute Zmax; multiplier will snap/highlight accordingly.
+    desiredZMaxUm = Math.max(1e-12, v);
+    applyDesiredZMaxToControls();
+    if (Z) renderAll();
+  });
+
+  function onXYLenChange(){
+    updateLateralScaleInfo();
+    if (Z){
+      updateMetrics();
+      renderAll();
+    }
+  }
+  if (xLenUmEl) xLenUmEl.addEventListener("change", onXYLenChange);
+  if (yLenUmEl) yLenUmEl.addEventListener("change", onXYLenChange);
+
+  // =========================
+  // Help modal
+  // =========================
+  const HELP = {
+    overview: {
+      title: "Roughness Visualizer Documentation",
+      body: () => {
+        const inputUnit = (Z_INPUT_TO_UM === 1e6) ? "meters (m)" : (Z_INPUT_TO_UM === 1.0) ? "micrometers (µm)" : "custom units";
+        const conv = (Z_INPUT_TO_UM === 1.0) ? "(no conversion)" : `multiplied by ${Z_INPUT_TO_UM.toLocaleString()} to convert to µm`;
+        return `
+          <p>This tool loads an <b>N×N</b> heightmap CSV and visualizes surface roughness in <b>2D</b> (heatmap, profiles, histogram) and <b>3D</b> (Plotly surface). All reported heights and metrics are in <b>µm</b>.</p>
+
+          <p><b>Quick start</b></p>
+          <ul>
+            <li><b>Load CSV</b>: drag & drop a file (NxN numbers), or click to choose.</li>
+            <li><b>Explore 2D</b>: click the heatmap for a row profile; <b>Shift+Click</b> for a column profile.</li>
+            <li><b>Adjust display</b>: change Colormap/Range/Downsample; plots update automatically.</li>
+            <li><b>3D scaling</b>: use the Z-axis × buttons or type Z-axis max (µm).</li>
+          </ul>
+
+          <p><b>CSV format & units</b></p>
+          <ul>
+            <li><b>Shape</b>: the file must be a square grid (same number of rows and columns).</li>
+            <li><b>Delimiters</b>: comma, TAB, or whitespace-separated values are accepted.</li>
+            <li><b>Units</b>: input values are assumed to be in <b>${inputUnit}</b> and are ${conv} at load time. If your file is already in µm, set <b>Z_INPUT_TO_UM = 1.0</b> in the code.</li>
+          </ul>
+
+          <p><b>Processing details</b></p>
+          <ul>
+            <li><b>Downsample</b>: displayed grid size is <b>floor(N / ds)</b>. Each displayed pixel is the <b>average</b> of a ds×ds block from the original grid.</li>
+            <li><b>Subtract mean (z − z̄)</b>: for visualization/plot ranges, subtracts the <b>global mean height</b> z̄ (it does not fit/remove a tilted plane).</li>
+            <li><b>Range</b>: Auto uses min/max; Clip uses an <b>approximate</b> 1st–99th percentile on the displayed grid; Manual uses your Min/Max values. This affects <b>color scaling</b> (2D/3D), not the underlying data.</li>
+            <li><b>Metrics</b>: the table values (z_min, Sa, Sq, …) are computed from the <b>full-resolution loaded grid</b> (after unit conversion). Downsample/Range/Demean do <b>not</b> change the metrics.</li>
+            <li><b>Histogram</b>: displayed as a <b>1–99% clipped</b> histogram (for readability), independent of the Range mode.</li>
+          </ul>
+
+          <p><b>3D Z-axis scaling</b></p>
+          <ul>
+            <li><b>Z-axis ×</b> scales the displayed Z range relative to the current data amplitude (based on the current Range + demean setting).</li>
+            <li><b>Z-axis max (µm)</b>: typing an exact value creates a <b>custom multiplier button</b> so the exact scale stays selectable.</li>
+            <li><b>Z range symmetry</b>: when demean is enabled (or the shown range crosses zero), the Plotly z-axis is displayed symmetrically (−Zmax … +Zmax).</li>
+            <li><b>Axis proportions</b>: the 3D box proportions stay fixed; increasing Zmax flattens the surface by changing the numeric range, not by shrinking the Z axis.</li>
+          </ul>
+
+          <p><b>Exports</b></p>
+          <ul>
+            <li>Each view has an <b>Export PNG</b> button. Metrics can be exported as a PNG table or copied as TSV.</li>
+          </ul>
+
+          <p><b>Version</b></p>
+          <ul>
+            <li><b>Roughness Visualizer</b> v${APP_VERSION}</li>
+          </ul>
+
+          <p><b>Citation recommendation</b></p>
+          <p class="small">If you use this tool in a report, thesis, or publication, consider citing it as:</p>
+          <ul>
+            <li>Olarve, J. S. <i>Roughness Visualizer</i> (web application). i-Nano Research Facility, De La Salle University Manila. Available at: <a href="${APP_URL}" target="_blank" rel="noopener noreferrer">${APP_URL}</a>. Accessed: ${new Date().toISOString().slice(0,10)}.</li>
+          </ul>
+
+          <p><b>Disclaimer</b></p>
+          <p class="small">This tool is provided “as is” for educational and research use. Validate results against instrument/software standards and your experimental procedure. The developer and institution are not responsible for decisions made based on this tool’s output.</p>
+
+          <p class="small">Everything runs locally in your browser (no server processing). Performance depends on N and your device; use Downsample for large grids.</p>
+        `;
+      }
+    },
+    colormap: {
+      title: "Colormap",
+      body: `<p>Controls how height values map to colors in the 2D heatmap and 3D Plotly surface. This changes only the visualization, not the underlying data.</p>`
+    },
+    downsample: {
+      title: "Downsample",
+      body: `<p>Reduces the displayed grid size for faster rendering (especially in 3D).</p>
+             <ul>
+               <li>The shown grid is <b>floor(N / ds)</b> per side.</li>
+               <li>Each shown point is the <b>average</b> of a ds×ds block from the original grid.</li>
+             </ul>`
+    },
+    xylen: {
+      title: "X/Y length (µm)",
+      body: `<p>Sets the physical size of the dataset along the X and Y axes (in micrometers).</p>
+             <ul>
+               <li>If set, the heatmap click readout and 3D Plotly X/Y axes can be shown in <b>µm</b> instead of index.</li>
+               <li>This does <b>not</b> change your Z values; it only provides physical scaling for X/Y.</li>
+             </ul>`
+    },
+    range: {
+      title: "Range",
+      body: `<p>Sets the min/max used for color scaling.</p>
+             <ul>
+               <li><b>Auto (min/max)</b>: uses the displayed data min and max.</li>
+               <li><b>Auto (1–99% clip)</b>: uses an <b>approximate</b> 1st–99th percentile to reduce outlier impact.</li>
+               <li><b>Manual</b>: you set Min and Max directly.</li>
+             </ul>`
+    },
+    meanPlane: {
+      title: "Subtract mean plane",
+      body: `<p>Subtracts the <b>global mean height</b> z̄ from the displayed data (z − z̄) so profiles/plots are centered.</p>
+             <p class="small">Note: this does <b>not</b> fit/remove a tilted plane; it only removes the overall mean.</p>`
+    },
+    zscale: {
+      title: "Z-axis scale",
+      body: `<p>Controls the <b>displayed Z-axis range</b> for the 3D surface using two synced settings:</p>
+             <ul>
+               <li><b>Z-axis ×</b>: quick buttons (0.5×…5.0×) that scale the displayed Z range relative to the dataset amplitude.</li>
+               <li><b>Z-axis max (µm)</b>: the <b>actual maximum Z</b> that will be shown on the Plotly axis.</li>
+             </ul>
+             <p>When you type a Z-axis max that doesn’t match one of the preset buttons, a <b>custom multiplier button</b> will appear so the exact value stays selectable.</p>
+             <p>This does <b>not</b> change your CSV values; it changes only the 3D visualization scale.</p>`
+    },
+    metrics: {
+      title: "Roughness metrics",
+      body: () => {
+        const hasSa = Number.isFinite(metricsSa);
+        const summary = hasSa
+          ? `<p><b>Current Sa:</b> ${fmt(metricsSa)} µm</p>`
+          : `<p class="small"><b>Tip:</b> Load a CSV to compute Sa.</p>`;
+
+        return `<p>These quantities summarize the surface height field <b>z</b> (µm) over the loaded grid.</p>
+          <p class="small">Formulas use all points in the loaded dataset (full resolution): for points <b>z</b><sub>i</sub>, i = 1…N (where N is the number of grid points).</p>
+                <ul>
+                  <li>
+                    <b>Minimum height (z_min)</b> – The lowest surface point relative to the reference mean plane.
+                    <br/><span class="small">Formula: z_min = min(z<sub>i</sub>)</span>
+                  </li>
+                  <li>
+                    <b>Maximum height (z_max)</b> – The highest surface point relative to the reference mean plane.
+                    <br/><span class="small">Formula: z_max = max(z<sub>i</sub>)</span>
+                  </li>
+                  <li>
+                    <b>Mean height (z̄)</b> – The average surface height over the measured area.
+                    <br/><span class="small">Formula: z̄ = (1/N) · Σ z<sub>i</sub></span>
+                  </li>
+                  <li>
+                    <b>Standard deviation (σ)</b> – The spread of height values around the mean, indicating overall surface variability.
+                    <br/><span class="small">Formula: σ = √((1/N) · Σ (z<sub>i</sub> − z̄)<sup>2</sup>)</span>
+                  </li>
+                  <li>
+                    <b>Arithmetic mean roughness (Sa)</b> – The average of the absolute surface height deviations from the mean plane.
+                    <br/><span class="small">Formula: Sa = (1/N) · Σ |z<sub>i</sub> − z̄|</span>
+                  </li>
+                  <li>
+                    <b>RMS roughness (Sq)</b> – The root mean square of surface height deviations, giving more weight to large peaks and valleys.
+                    <br/><span class="small">Formula: Sq = √((1/N) · Σ (z<sub>i</sub> − z̄)<sup>2</sup>)</span>
+                  </li>
+                  <li>
+                    <b>Peak-to-valley (Sz)</b> – The total vertical distance between the highest peak and lowest valley (z_max − z_min).
+                    <br/><span class="small">Formula: Sz = z_max − z_min</span>
+                  </li>
+                  <li>
+                    <b>Skewness (Ssk)</b> – A measure of whether the surface has more dominant peaks (positive) or valleys (negative).
+                    <br/><span class="small">Formula: Ssk = ((1/N) · Σ (z<sub>i</sub> − z̄)<sup>3</sup>) / σ<sup>3</sup></span>
+                  </li>
+                  <li>
+                    <b>Kurtosis (Sku)</b> – A measure of how sharp or spiky the height distribution is compared to a normal distribution.
+                    <br/><span class="small">Formula: Sku = ((1/N) · Σ (z<sub>i</sub> − z̄)<sup>4</sup>) / σ<sup>4</sup></span>
+                  </li>
+                </ul>
+                <p class="small">Note: Ssk and Sku are dimensionless and can be sensitive to outliers.</p>
+                ${summary}`;
+      }
+    }
+  };
+
+  const helpOverlay = el("helpOverlay");
+  const helpTitle = el("helpTitle");
+  const helpBody = el("helpBody");
+  const helpClose = el("helpClose");
+  const homeOverlay = el("homeOverlay");
+  const homeClose = el("homeClose");
+  const homeCancel = el("homeCancel");
+  const homeConfirm = el("homeConfirm");
+  const homeTrigger = el("homeBtn");
+  const demoOverlay = el("demoOverlay");
+  const demoClose = el("demoClose");
+  const demoCancel = el("demoCancel");
+  const demoConfirm = el("demoConfirm");
+  const demoTrigger = el("loadDemo");
+  const resetOverlay = el("resetOverlay");
+  const resetClose = el("resetClose");
+  const resetCancel = el("resetCancel");
+  const resetConfirm = el("resetConfirm");
+  const resetTrigger = el("reset");
+
+  function setDialogState(open){
+    document.body.classList.toggle("dialogOpen", open);
+  }
+
+  function openResetDialog(){
+    if (!resetOverlay) return;
+    resetOverlay.hidden = false;
+    setDialogState(true);
+    try{ resetCancel?.focus(); } catch {}
+  }
+
+  function openHomeDialog(){
+    if (!homeOverlay) return;
+    homeOverlay.hidden = false;
+    setDialogState(true);
+    try{ homeCancel?.focus(); } catch {}
+  }
+
+  function openDemoDialog(){
+    if (!demoOverlay) return;
+    demoOverlay.hidden = false;
+    setDialogState(true);
+    try{ demoCancel?.focus(); } catch {}
+  }
+
+  function closeDemoDialog(){
+    if (!demoOverlay) return;
+    demoOverlay.hidden = true;
+    if ((!helpOverlay || helpOverlay.hidden) && (!homeOverlay || homeOverlay.hidden) && (!resetOverlay || resetOverlay.hidden)) setDialogState(false);
+    try{ demoTrigger?.focus(); } catch {}
+  }
+
+  function closeHomeDialog(){
+    if (!homeOverlay) return;
+    homeOverlay.hidden = true;
+    if ((!helpOverlay || helpOverlay.hidden) && (!demoOverlay || demoOverlay.hidden) && (!resetOverlay || resetOverlay.hidden)) setDialogState(false);
+    try{ homeTrigger?.focus(); } catch {}
+  }
+
+  function closeResetDialog(){
+    if (!resetOverlay) return;
+    resetOverlay.hidden = true;
+    if ((!helpOverlay || helpOverlay.hidden) && (!homeOverlay || homeOverlay.hidden) && (!demoOverlay || demoOverlay.hidden)) setDialogState(false);
+    try{ resetTrigger?.focus(); } catch {}
+  }
+
+  function openHelp(key){
+    const h = HELP[key];
+    if (!h || !helpOverlay) return;
+    setDialogState(true);
+    if (helpTitle) helpTitle.textContent = "Roughness Visualizer Documentation";
+    const bodyHtml = (typeof h.body === "function") ? h.body() : h.body;
+    if (helpBody){
+      helpBody.innerHTML = (key === "overview")
+        ? bodyHtml
+        : `<p><b>${h.title}</b></p>${bodyHtml}`;
+    }
+    helpOverlay.hidden = false;
+    try{ helpClose?.focus(); } catch {}
+  }
+  function closeHelp(){
+    if (!helpOverlay) return;
+    helpOverlay.hidden = true;
+    if (helpBody) helpBody.innerHTML = "";
+    if ((!resetOverlay || resetOverlay.hidden) && (!homeOverlay || homeOverlay.hidden) && (!demoOverlay || demoOverlay.hidden)) setDialogState(false);
+  }
+
+  // Always start with help closed (also fixes BFCache restores)
+  closeHelp();
+  closeHomeDialog();
+  closeDemoDialog();
+  closeResetDialog();
+  window.addEventListener("pageshow", () => {
+    closeHelp();
+    closeHomeDialog();
+    closeDemoDialog();
+    closeResetDialog();
+  });
+
+  document.addEventListener("click", (e) => {
+    const btn = e.target?.closest?.(".helpBtn");
+    if (btn){
+      openHelp(btn.dataset.help);
+      return;
+    }
+    if (e.target === helpOverlay) closeHelp();
+    if (e.target === helpClose) closeHelp();
+  });
+
+  // Top header Help button
+  el("topHelp")?.addEventListener("click", () => openHelp("overview"));
+
+  homeTrigger?.addEventListener("click", (e) => {
+    e.preventDefault();
+    openHomeDialog();
+  });
+  homeClose?.addEventListener("click", () => closeHomeDialog());
+  homeCancel?.addEventListener("click", () => closeHomeDialog());
+  homeOverlay?.addEventListener("click", (e) => {
+    if (e.target === homeOverlay) closeHomeDialog();
+  });
+  homeConfirm?.addEventListener("click", () => {
+    window.location.href = HOME_URL;
+  });
+
+  demoTrigger?.addEventListener("click", () => openDemoDialog());
+  demoClose?.addEventListener("click", () => closeDemoDialog());
+  demoCancel?.addEventListener("click", () => closeDemoDialog());
+  demoOverlay?.addEventListener("click", (e) => {
+    if (e.target === demoOverlay) closeDemoDialog();
+  });
+  demoConfirm?.addEventListener("click", () => {
+    closeDemoDialog();
+    loadDemoData();
+  });
+
+  resetClose?.addEventListener("click", () => closeResetDialog());
+  resetCancel?.addEventListener("click", () => closeResetDialog());
+  resetOverlay?.addEventListener("click", (e) => {
+    if (e.target === resetOverlay) closeResetDialog();
+  });
+  resetConfirm?.addEventListener("click", () => {
+    window.location.reload();
+  });
+
+  document.addEventListener("keydown", (e) => {
+    if (e.key !== "Escape") return;
+    if (demoOverlay && !demoOverlay.hidden){
+      closeDemoDialog();
+      return;
+    }
+    if (homeOverlay && !homeOverlay.hidden){
+      closeHomeDialog();
+      return;
+    }
+    if (resetOverlay && !resetOverlay.hidden){
+      closeResetDialog();
+      return;
+    }
+    if (helpOverlay && !helpOverlay.hidden) closeHelp();
+  });
+
+  // Export helpers
+  function exportCanvasPNG(canvas, filename){
+    const a = document.createElement("a");
+    a.download = filename;
+    a.href = canvas.toDataURL("image/png");
+    a.click();
+  }
+
+  // Exports
+  el("exportHeat").addEventListener("click", () => exportCanvasPNG(heat, "sem_heatmap.png"));
+  el("exportProfile").addEventListener("click", () => exportCanvasPNG(prof, "sem_line_profile.png"));
+  el("exportHist").addEventListener("click", () => exportCanvasPNG(hist, "sem_histogram.png"));
+
+  el("exportPlotly").addEventListener("click", async () => {
+    try{
+      await Plotly.downloadImage("plotly3d", { format:"png", filename:"sem_plotly_surface", height:900, width:1200, scale:2 });
+    } catch(err){
+      alert("Plotly export failed. Render the plot first.");
+    }
+  });
+
+  // Publication-ready exports
+  el("exportMetricsPng").addEventListener("click", async () => {
+    if (!metricsReport) return;
+    if (!Z){
+      alert("No data loaded. Load a CSV first.");
+      return;
+    }
+    if (typeof html2canvas !== "function"){
+      alert("PNG export unavailable (html2canvas not loaded).");
+      return;
+    }
+    try{
+      const canvas = await html2canvas(metricsReport, {
+        backgroundColor: "#ffffff",
+        scale: Math.max(2, window.devicePixelRatio || 1),
+        useCORS: true
+      });
+      exportCanvasPNG(canvas, "roughness_metrics.png");
+    } catch(err){
+      console.error(err);
+      alert("Export failed.");
+    }
+  });
+
+  el("copyMetricsTsv").addEventListener("click", async () => {
+    if (!Z || !metricsBody){
+      alert("No data loaded. Load a CSV first.");
+      return;
+    }
+    const rows = Array.from(metricsBody.querySelectorAll("tr")).map(tr =>
+      Array.from(tr.querySelectorAll("td")).map(td => td.textContent.trim())
+    );
+    const tsv = ["Metric\tSymbol\tValue\tUnit", ...rows.map(r => r.join("\t"))].join("\n");
+    const showFeedback = (html) => {
+      if (!metricsActionsFeedback) return;
+      metricsActionsFeedback.innerHTML = html;
+      window.clearTimeout(showFeedback._t);
+      showFeedback._t = window.setTimeout(() => {
+        if (metricsActionsFeedback) metricsActionsFeedback.textContent = "";
+      }, 2200);
+    };
+    try{
+      await navigator.clipboard.writeText(tsv);
+      showFeedback('<span class="ok">Copied TSV to clipboard.</span>');
+    } catch(err){
+      // Fallback for non-secure contexts / denied clipboard permission
+      try{
+        const ta = document.createElement("textarea");
+        ta.value = tsv;
+        ta.style.position = "fixed";
+        ta.style.left = "-9999px";
+        document.body.appendChild(ta);
+        ta.select();
+        const ok = document.execCommand("copy");
+        document.body.removeChild(ta);
+        if (!ok) throw new Error("execCommand copy failed");
+        showFeedback('<span class="ok">Copied TSV to clipboard.</span>');
+      } catch{
+        console.error(err);
+        showFeedback('<span class="err">Copy failed. Your browser may block clipboard access.</span>');
+      }
+    }
+  });
+
+  // Initialize Z-axis multiplier UI
+  setActiveZMultButton(1.0);
+  if (el("zscaleVal")) el("zscaleVal").textContent = "1.0×";
+  if (el("zmaxNum")) el("zmaxNum").value = String(Number(el("zmaxNum").value) || 10);
+
+  // Initialize X/Y scale info
+  updateLateralScaleInfo();
+
+  // Default tab
+  setTab("2d");
+})();
+</script>
+</body>
+</html>
