@@ -28,98 +28,119 @@ Roughness Visualizer is a browser-based roughness analysis tool for square CSV h
 
 ---
 
-## Key Features
+## ✨ Highlights
 
-- Load local microscopy and scientific images
-- Calibrate scale using a known reference length
-- Measure:
-	- Lengths
-	- Angles
-	- Areas (polygon and circular)
-- Perform particle and hole (void) analysis
-- Apply preprocessing:
-	- Background subtraction
-	- Smoothing filters
-	- Morphological operations
-- Thresholding methods:
-	- Otsu (auto)
-	- Manual
-	- Adaptive
-- Generate descriptive statistics and histograms
-- Export:
-	- Annotated images (PNG)
-	- Measurement data (TSV format)
+- Load square height-map CSV files directly in the browser
+- Visualize the surface as a 2D heat map, line profile, histogram, and interactive 3D surface
+- Compute roughness metrics from the full-resolution dataset
+- Adjust display settings such as colormap, downsample factor, range clipping, and 3D Z scaling
+- Export plots as PNG and copy metric tables as TSV
+- Run entirely client-side with no server-side processing
 
----
+## 🚀 Quick Start
 
-## 📘 Methodology
+1. Open [index.html](index.html) in a modern browser.
+2. Drag and drop a CSV file onto the page, or choose one manually.
+3. Inspect the 2D heat map.
+4. Click the heat map to extract a row profile, or use Shift+Click to inspect a column profile.
+5. Switch to the 3D view to examine the surface topography interactively.
+6. Export plots or roughness metrics when needed.
 
-See detailed methodology in [docs/methodology.md](docs/methodology.md)
+## 📥 Input Requirements
 
----
+The tool expects a square numeric dataset representing a height map.
 
-## Assumptions
+- Shape: the CSV must be an N x N grid
+- Accepted separators: comma, tab, or whitespace
+- Input values are converted to micrometers for display and reporting
+- Metrics are computed from the full-resolution loaded grid after unit conversion
 
-- The image is free from geometric distortion
-- Calibration reference is accurate
-- Measurements are performed on a single plane
+If your measurement data is already in micrometers, verify the unit conversion settings in [index.html](index.html) before using the output in reports.
 
----
+## 📊 Views And Analysis
 
-## Quick Start
+### 🗺️ 2D View
 
-1. Load an image (drag and drop or file upload)
-2. Set the scale using a known reference length
-3. Select a measurement mode (length, angle, area, particle, hole)
-4. Perform measurements
-5. Export results (TSV or image)
+- Heat map for quick spatial inspection of surface variation
+- Line profile extracted from a selected row or column
+- Histogram of height distribution for the displayed dataset
 
----
+### 🧊 3D View
 
-## Particle And Hole Analysis
+- Interactive Plotly surface rendering
+- Shared colormap and display range with the 2D view
+- Adjustable Z-axis scale for clearer topography inspection
 
-Includes automated detection using:
+## 🎛️ Display Controls
 
-- ROI (Region of Interest) selection
-- Background subtraction
-- Smoothing filters (Gaussian / Median)
-- Morphological opening
-- Thresholding (Auto, Manual, Adaptive)
+The viewer separates display settings from metric calculations.
 
-Outputs include:
+- Downsample reduces the rendered grid size for faster display, especially in 3D
+- Subtract mean centers the displayed values around the global mean height
+- Range mode supports automatic min/max, approximate 1 to 99 percent clipping, or manual limits
+- Z-axis scaling changes only the displayed 3D range, not the underlying dataset
 
-- Count
-- Mean area
-- Equivalent Circular Diameter (ECD)
-- Size distribution
+Display settings affect visualization, but the roughness metrics remain based on the original loaded data.
 
----
+## 📐 Roughness Metrics
 
-## Statistics And Visualization
+The application reports the following metrics from the loaded surface data:
 
-- Descriptive statistics (mean, median, standard deviation, quartiles)
-- Histogram visualization
-- Available when sufficient data points are present
+- Minimum height, z_min
+- Maximum height, z_max
+- Mean height, z_bar
+- Standard deviation, sigma
+- Arithmetic mean roughness, Sa
+- RMS roughness, Sq
+- Peak-to-valley height, Sz
+- Skewness, Ssk
+- Kurtosis, Sku
 
----
+Definitions used by the tool:
 
-## Validation
+- Sa: mean absolute deviation from the mean plane
+- Sq: root mean square of height deviation from the mean plane
+- Sz: z_max minus z_min
+- Ssk: normalized third moment of the height distribution
+- Sku: normalized fourth moment of the height distribution
 
-MicroMeasure is designed to provide consistent measurements comparable to standard tools such as ImageJ under proper calibration conditions.
+Ssk and Sku are dimensionless and can be sensitive to outliers.
 
-Users are encouraged to validate results for their specific applications.
+## 💾 Export Options
 
----
+The application supports exporting analysis outputs for reporting and documentation.
 
-## Use Cases
+- Heat map PNG
+- Line profile PNG
+- Histogram PNG
+- 3D surface PNG
+- Roughness metrics table PNG
+- Roughness metrics copied as TSV to the clipboard
 
-- SEM micrograph analysis
-- Materials characterization
-- Biological image measurement
-- Laboratory instruction and demonstrations
-- Rapid browser-based analysis
+## 🛠️ Technology
 
----
+- Single-file HTML application in [index.html](index.html)
+- Plotly for interactive 3D visualization
+- html2canvas for metrics table export
+- No build tooling or backend required
+
+## 💻 Local Use
+
+You can run the project by opening [index.html](index.html) directly in a browser.
+
+For the best experience:
+
+- Use an up-to-date Chromium, Edge, or Firefox-based browser
+- Prefer HTTPS or a secure context if you rely on clipboard behavior
+- Increase downsample for very large grids or constrained devices
+
+## ⚠️ Notes And Limitations
+
+- The tool runs fully in the browser; no uploaded data is sent to a server
+- Performance depends on dataset size and device graphics capability
+- Large 3D surfaces may require higher downsampling because of WebGL limits
+- Subtract mean removes the global mean height only; it does not perform full plane fitting or tilt correction
+
 
 ## Run Locally
 
@@ -145,8 +166,8 @@ This project is deployed using GitHub Pages and runs entirely in the browser.
 
 If you use MicroMeasure, please cite:
 
-Olarve, J. S. (2026). *MicroMeasure: A Web-Based Image Measurement Tool* (v1.2.0). Zenodo.  
-https://doi.org/10.5281/zenodo.19418861
+Olarve, J. S. (2026). *RoughnessVisualizer: A Web-Based Roughness Analysis Tool* (v1.1.0). Zenodo.  
+https://doi.org/10.5281/zenodo.19678928
 
 This project now includes a citation metadata file: [CITATION.cff](CITATION.cff)
 
@@ -160,11 +181,9 @@ This project is licensed under the MIT License. See [LICENSE](LICENSE).
 
 ## Disclaimer
 
-MicroMeasure is intended for research and educational use.
+This tool is provided “as is” for educational and research use. Validate results against instrument/software standards and your experimental procedure. The developer and institution are not responsible for decisions made based on this tool’s output.
 
-While efforts have been made to ensure accuracy, users are responsible for verifying calibration and validating results for their specific applications.
-
-This tool does not replace certified metrology software or instrument calibration standards.
+Everything runs locally in your browser (no server processing). Performance depends on N and your device; use Downsample for large grids.
 
 ---
 
