@@ -902,8 +902,10 @@
   const Z_INPUT_TO_UM = 1e6;
 
   // App metadata (shown in Documentation)
-  const APP_VERSION = "1.0";
-  const APP_URL = "https://www.inanolab.com/roughness.html";
+  const APP_VERSION = "1.1.0";
+  const APP_LIVE_URL = "https://jamesolarve.github.io/roughnessvisualizer/";
+  const APP_PROJECT_URL = "https://inanolab.com/roughness.html";
+  const APP_URL = APP_PROJECT_URL;
   const HOME_URL = "https://www.inanolab.com/#extras";
 
   // WebGL state
@@ -2318,6 +2320,12 @@
         const inputUnit = (Z_INPUT_TO_UM === 1e6) ? "meters (m)" : (Z_INPUT_TO_UM === 1.0) ? "micrometers (µm)" : "custom units";
         const conv = (Z_INPUT_TO_UM === 1.0) ? "(no conversion)" : `multiplied by ${Z_INPUT_TO_UM.toLocaleString()} to convert to µm`;
         return `
+          <p><b>Version:</b> ${APP_VERSION}<br>
+          <b>Developer:</b> Dr. James Salveo Olarve<br>
+          <b>Affiliation:</b> i-Nano Research Facility, De La Salle University Manila<br>
+          <b>Live App:</b> <a href="${APP_LIVE_URL}" target="_blank" rel="noopener noreferrer">${APP_LIVE_URL}</a><br>
+          <b>Project Page:</b> <a href="${APP_PROJECT_URL}" target="_blank" rel="noopener noreferrer">${APP_PROJECT_URL}</a></p>
+
           <p>This tool loads an <b>N×N</b> heightmap CSV and visualizes surface roughness in <b>2D</b> (heatmap, profiles, histogram) and <b>3D</b> (Plotly surface). All reported heights and metrics are in <b>µm</b>.</p>
 
           <p><b>Quick start</b></p>
@@ -2367,6 +2375,9 @@
           <ul>
             <li>Olarve, J. S. <i>Roughness Visualizer</i> (web application). i-Nano Research Facility, De La Salle University Manila. Available at: <a href="${APP_URL}" target="_blank" rel="noopener noreferrer">${APP_URL}</a>. Accessed: ${new Date().toISOString().slice(0,10)}.</li>
           </ul>
+
+          <p><b>🏛️ Acknowledgment</b></p>
+          <p class="small">Developed by the i-Nano Research Facility,<br>De La Salle University Manila.</p>
 
           <p><b>Disclaimer</b></p>
           <p class="small">This tool is provided “as is” for educational and research use. Validate results against instrument/software standards and your experimental procedure. The developer and institution are not responsible for decisions made based on this tool’s output.</p>

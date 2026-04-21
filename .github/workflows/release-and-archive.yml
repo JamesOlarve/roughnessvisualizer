@@ -1,0 +1,94 @@
+name: Release and Archive
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Release version, for example 1.2.0"
+        required: true
+        type: string
+      doi:
+        description: "Version DOI, for example 10.5281/zenodo.12345678"
+        required: true
+        type: string
+      release_year:
+        description: "Citation year used in README"
+        required: true
+        type: string
+      tag_name:
+        description: "Optional Git tag name. Defaults to v<version>."
+        required: false
+        type: string
+      publish_release:
+        description: "Create a GitHub release after syncing metadata"
+        required: true
+        default: true
+        type: boolean
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Resolve tag name
+        id: vars
+        shell: bash
+        run: |
+          if [ -n "${{ inputs.tag_name }}" ]; then
+            echo "tag_name=${{ inputs.tag_name }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "tag_name=v${{ inputs.version }}" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Sync README and CITATION metadata
+        env:
+          RELEASE_VERSION: ${{ inputs.version }}
+          RELEASE_DOI: ${{ inputs.doi }}
+          RELEASE_YEAR: ${{ inputs.release_year }}
+        shell: pwsh
+        run: ./scripts/sync-release-metadata.ps1
+
+      - name: Commit metadata updates
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add README.md CITATION.cff
+          if git diff --cached --quiet; then
+            echo "No metadata changes to commit."
+          else
+            git commit -m "chore: sync release metadata for v${{ inputs.version }}"
+            git push origin HEAD
+          fi
+
+      - name: Fail if tag already exists
+        shell: bash
+        run: |
+          if git rev-parse "${{ steps.vars.outputs.tag_name }}" >/dev/null 2>&1; then
+            echo "Tag ${{ steps.vars.outputs.tag_name }} already exists."
+            exit 1
+          fi
+
+      - name: Create and push tag
+        shell: bash
+        run: |
+          git tag "${{ steps.vars.outputs.tag_name }}"
+          git push origin "${{ steps.vars.outputs.tag_name }}"
+
+      - name: Create GitHub release
+        if: ${{ inputs.publish_release }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          gh release create "${{ steps.vars.outputs.tag_name }}" \
+            --title "${{ steps.vars.outputs.tag_name }}" \
+            --generate-notes

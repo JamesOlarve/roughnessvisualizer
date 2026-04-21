@@ -10,6 +10,7 @@ Affiliation: i-Nano Research Facility, De La Salle University Manila
 
 Live App: https://jamesolarve.github.io/roughnessvisualizer/  
 Project Page: https://inanolab.com/roughness.html
+Source Repository: https://github.com/JamesOlarve/roughnessvisualizer
 
 ---
 
@@ -160,11 +161,24 @@ http://localhost:8000/
 
 This project is deployed using GitHub Pages and runs entirely in the browser.
 
+## Maintainer Release Workflow
+
+This repository includes a GitHub Actions workflow at `.github/workflows/release-and-archive.yml` to keep the release metadata synchronized.
+
+When preparing a new version:
+
+1. Mint or reserve the Zenodo version DOI for the release.
+2. Run the `Release and Archive` workflow from GitHub Actions.
+3. Provide the release version, Zenodo DOI, and citation year.
+4. The workflow updates [README.md](README.md) and [CITATION.cff](CITATION.cff), commits the metadata change, creates a Git tag, and optionally publishes a GitHub release.
+
+The workflow uses [scripts/sync-release-metadata.ps1](scripts/sync-release-metadata.ps1) so the DOI badge, README citation text, README version line, and `CITATION.cff` values all stay in sync.
+
 ---
 
 ## Citation
 
-If you use MicroMeasure, please cite:
+If you use Roughness Visualizer, please cite:
 
 Olarve, J. S. (2026). *RoughnessVisualizer: A Web-Based Roughness Analysis Tool* (v1.1.0). Zenodo.  
 https://doi.org/10.5281/zenodo.19678928
@@ -187,7 +201,7 @@ Everything runs locally in your browser (no server processing). Performance depe
 
 ---
 
-## Acknowledgment
+## 🏛️ Acknowledgment
 
-Developed by the i-Nano Research Facility  
-De La Salle University Manila
+Developed by the i-Nano Research Facility,  
+De La Salle University Manila.
