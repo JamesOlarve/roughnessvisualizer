@@ -1,128 +1,174 @@
-# Roughness Visualizer
+# RoughnessVisualizer
+
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.19678928.svg)](https://doi.org/10.5281/zenodo.19678928)
+
+A Web-Based Scientific Roughness Analysis Tool 
+Version: 1.1.0
+
+Developer: Dr. James Salveo Olarve  
+Affiliation: i-Nano Research Facility, De La Salle University Manila
+
+Live App: https://jamesolarve.github.io/roughnessvisualizer/  
+Project Page: https://inanolab.com/roughness.html
+
+---
+
+## Overview
 
 Roughness Visualizer is a browser-based roughness analysis tool for square CSV height maps. It loads surface data locally in the browser, visualizes the dataset in 2D and 3D, and computes common surface roughness metrics in micrometers.
 
-The application is designed for fast inspection of scanned or measured surface data without requiring a backend service, local installation, or build step.
+---
 
-## Highlights
+## Intended Users
 
-- Load square height-map CSV files directly in the browser
-- Visualize the surface as a 2D heat map, line profile, histogram, and interactive 3D surface
-- Compute roughness metrics from the full-resolution dataset
-- Adjust display settings such as colormap, downsample factor, range clipping, and 3D Z scaling
-- Export plots as PNG and copy metric tables as TSV
-- Run entirely client-side with no server-side processing
+- Researchers and laboratory personnel
+- Graduate and undergraduate students
+- Educators and instructors
+- Users in materials science, physics, chemistry, biology, and engineering
+
+---
+
+## Key Features
+
+- Load local microscopy and scientific images
+- Calibrate scale using a known reference length
+- Measure:
+	- Lengths
+	- Angles
+	- Areas (polygon and circular)
+- Perform particle and hole (void) analysis
+- Apply preprocessing:
+	- Background subtraction
+	- Smoothing filters
+	- Morphological operations
+- Thresholding methods:
+	- Otsu (auto)
+	- Manual
+	- Adaptive
+- Generate descriptive statistics and histograms
+- Export:
+	- Annotated images (PNG)
+	- Measurement data (TSV format)
+
+---
+
+## 📘 Methodology
+
+See detailed methodology in [docs/methodology.md](docs/methodology.md)
+
+---
+
+## Assumptions
+
+- The image is free from geometric distortion
+- Calibration reference is accurate
+- Measurements are performed on a single plane
+
+---
 
 ## Quick Start
 
-1. Open [index.html](index.html) in a modern browser.
-2. Drag and drop a CSV file onto the page, or choose one manually.
-3. Inspect the 2D heat map.
-4. Click the heat map to extract a row profile, or use Shift+Click to inspect a column profile.
-5. Switch to the 3D view to examine the surface topography interactively.
-6. Export plots or roughness metrics when needed.
+1. Load an image (drag and drop or file upload)
+2. Set the scale using a known reference length
+3. Select a measurement mode (length, angle, area, particle, hole)
+4. Perform measurements
+5. Export results (TSV or image)
 
-## Input Requirements
+---
 
-The tool expects a square numeric dataset representing a height map.
+## Particle And Hole Analysis
 
-- Shape: the CSV must be an N x N grid
-- Accepted separators: comma, tab, or whitespace
-- Input values are converted to micrometers for display and reporting
-- Metrics are computed from the full-resolution loaded grid after unit conversion
+Includes automated detection using:
 
-If your measurement data is already in micrometers, verify the unit conversion settings in [index.html](index.html) before using the output in reports.
+- ROI (Region of Interest) selection
+- Background subtraction
+- Smoothing filters (Gaussian / Median)
+- Morphological opening
+- Thresholding (Auto, Manual, Adaptive)
 
-## Views And Analysis
+Outputs include:
 
-### 2D View
+- Count
+- Mean area
+- Equivalent Circular Diameter (ECD)
+- Size distribution
 
-- Heat map for quick spatial inspection of surface variation
-- Line profile extracted from a selected row or column
-- Histogram of height distribution for the displayed dataset
+---
 
-### 3D View
+## Statistics And Visualization
 
-- Interactive Plotly surface rendering
-- Shared colormap and display range with the 2D view
-- Adjustable Z-axis scale for clearer topography inspection
+- Descriptive statistics (mean, median, standard deviation, quartiles)
+- Histogram visualization
+- Available when sufficient data points are present
 
-## Display Controls
+---
 
-The viewer separates display settings from metric calculations.
+## Validation
 
-- Downsample reduces the rendered grid size for faster display, especially in 3D
-- Subtract mean centers the displayed values around the global mean height
-- Range mode supports automatic min/max, approximate 1 to 99 percent clipping, or manual limits
-- Z-axis scaling changes only the displayed 3D range, not the underlying dataset
+MicroMeasure is designed to provide consistent measurements comparable to standard tools such as ImageJ under proper calibration conditions.
 
-Display settings affect visualization, but the roughness metrics remain based on the original loaded data.
+Users are encouraged to validate results for their specific applications.
 
-## Roughness Metrics
+---
 
-The application reports the following metrics from the loaded surface data:
+## Use Cases
 
-- Minimum height, z_min
-- Maximum height, z_max
-- Mean height, z_bar
-- Standard deviation, sigma
-- Arithmetic mean roughness, Sa
-- RMS roughness, Sq
-- Peak-to-valley height, Sz
-- Skewness, Ssk
-- Kurtosis, Sku
+- SEM micrograph analysis
+- Materials characterization
+- Biological image measurement
+- Laboratory instruction and demonstrations
+- Rapid browser-based analysis
 
-Definitions used by the tool:
+---
 
-- Sa: mean absolute deviation from the mean plane
-- Sq: root mean square of height deviation from the mean plane
-- Sz: z_max minus z_min
-- Ssk: normalized third moment of the height distribution
-- Sku: normalized fourth moment of the height distribution
+## Run Locally
 
-Ssk and Sku are dimensionless and can be sensitive to outliers.
+Because this is a static web application:
 
-## Export Options
+```bash
+python -m http.server 8000
+```
 
-The application supports exporting analysis outputs for reporting and documentation.
+Open:
 
-- Heat map PNG
-- Line profile PNG
-- Histogram PNG
-- 3D surface PNG
-- Roughness metrics table PNG
-- Roughness metrics copied as TSV to the clipboard
+http://localhost:8000/
 
-## Technology
+---
 
-- Single-file HTML application in [index.html](index.html)
-- Plotly for interactive 3D visualization
-- html2canvas for metrics table export
-- No build tooling or backend required
+## Deployment
 
-## Local Use
+This project is deployed using GitHub Pages and runs entirely in the browser.
 
-You can run the project by opening [index.html](index.html) directly in a browser.
-
-For the best experience:
-
-- Use an up-to-date Chromium, Edge, or Firefox-based browser
-- Prefer HTTPS or a secure context if you rely on clipboard behavior
-- Increase downsample for very large grids or constrained devices
-
-## Notes And Limitations
-
-- The tool runs fully in the browser; no uploaded data is sent to a server
-- Performance depends on dataset size and device graphics capability
-- Large 3D surfaces may require higher downsampling because of WebGL limits
-- Subtract mean removes the global mean height only; it does not perform full plane fitting or tilt correction
+---
 
 ## Citation
 
-If you use this tool in a thesis, report, or publication, cite it in a form similar to:
+If you use MicroMeasure, please cite:
 
-Olarve, J. S. Roughness Visualizer (web application). i-Nano Research Facility, De La Salle University Manila.
+Olarve, J. S. (2026). *MicroMeasure: A Web-Based Image Measurement Tool* (v1.2.0). Zenodo.  
+https://doi.org/10.5281/zenodo.19418861
+
+This project now includes a citation metadata file: [CITATION.cff](CITATION.cff)
+
+---
 
 ## License
 
 This project is licensed under the MIT License. See [LICENSE](LICENSE).
+
+---
+
+## Disclaimer
+
+MicroMeasure is intended for research and educational use.
+
+While efforts have been made to ensure accuracy, users are responsible for verifying calibration and validating results for their specific applications.
+
+This tool does not replace certified metrology software or instrument calibration standards.
+
+---
+
+## Acknowledgment
+
+Developed by the i-Nano Research Facility  
+De La Salle University Manila
