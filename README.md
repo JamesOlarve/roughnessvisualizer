@@ -18,6 +18,10 @@ Source Repository: https://github.com/JamesOlarve/roughnessvisualizer
 
 Roughness Visualizer is a browser-based roughness analysis tool for square CSV height maps. It loads surface data locally in the browser, visualizes the dataset in 2D and 3D, and computes common surface roughness metrics in micrometers.
 
+## Screenshot
+
+![Roughness Visualizer screenshot](roughness.png)
+
 ---
 
 ## Intended Users
