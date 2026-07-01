@@ -8,7 +8,7 @@ doi: 10.5281/zenodo.19678928
 authors:
   - family-names: Olarve
     given-names: James Salveo
-    affiliation: i-Nano Research Facility, De La Salle University Manila
+    affiliation: De La Salle University Manila
 abstract: >-
   Browser-based scientific roughness analysis software for square CSV height maps,
   with local 2D and 3D visualization and common surface roughness metrics.

@@ -6,7 +6,7 @@ A Web-Based Scientific Roughness Analysis Tool
 Version: 1.1.0
 
 Developer: Dr. James Salveo Olarve  
-Affiliation: i-Nano Research Facility, De La Salle University Manila
+Affiliation: De La Salle University Manila
 
 Live App: https://jamesolarve.github.io/roughnessvisualizer/  
 Project Page: https://inanolab.com/roughness.html
